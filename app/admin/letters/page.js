@@ -1,17 +1,12 @@
 // app/admin/letters/page.js
 'use client';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import PageLayout from '../../components/PageLayout';
 import CastleLocationInput from '../../components/CastleLocationInput';
 import Link from 'next/link';
 
 // ─────────────────────────────────────────────────────────
 // 서신 템플릿 레지스트리
-// 새 서신 종류를 추가하려면: 아래 목록에 항목 하나 추가 + 폼 컴포넌트 하나 만들고
-// renderTemplateForm()의 switch에 연결하면 됩니다.
-// '자유 형식 서신(섹션형)'은 소제목+색상+본문 구조를 가진 대부분의 공지
-// (법령, 격려 메시지 등)를 커버하고, '전쟁 일정·전선·전략'은 좌표가 필요한
-// 작전 일정 + 자유 섹션을 함께 다루는 전용 템플릿입니다.
 // ─────────────────────────────────────────────────────────
 const LETTER_TEMPLATES = [
   { id: 'siege_schedule', label: '공성 일정 변경', status: 'ready' },
@@ -28,6 +23,20 @@ const HIGHLIGHT_TAGS = [
   { tag: 'b', label: '파랑', color: '#2b5fc0' },
   { tag: 'g', label: '초록', color: '#2e7d32' },
 ];
+
+// ─────────────────────────────────────────────────────────
+// 공성 일정 자동 채우기 프리셋
+// title에 keyword가 포함되면 해당 프리셋 내용으로 자동 채워집니다.
+// 새 프리셋을 추가하려면 이 배열에 객체 하나만 추가하면 됩니다.
+// 예: { keyword: '완성공성지원', entries: [...], cautionsText: '...', footerText: '...' }
+// ─────────────────────────────────────────────────────────
+const SIEGE_PRESETS = [
+  // 아직 등록된 프리셋 없음 — 필요할 때 여기에 추가
+];
+
+function findSiegePreset(title) {
+  return SIEGE_PRESETS.find((p) => title.includes(p.keyword));
+}
 
 function CharCounter({ current, limit }) {
   const over = current > limit;
@@ -194,8 +203,23 @@ function SiegeScheduleForm() {
     '바쁘시더라도 공성 시간 확인을 부탁드리며, 오늘도 힘써주시는 맹원 여러분께 진심으로 감사드립니다!'
   );
   const [copied, setCopied] = useState(false);
+  const [appliedPresetKeyword, setAppliedPresetKeyword] = useState(null);
   const cautionsRef = useRef(null);
   const nextIdRef = useRef(2);
+
+  // 제목에 등록된 프리셋 키워드가 포함되면 자동으로 내용을 채움
+  useEffect(() => {
+    const preset = findSiegePreset(title);
+    if (preset && preset.keyword !== appliedPresetKeyword) {
+      setEntries(preset.entries.map((e, idx) => ({ id: idx + 1, ...e })));
+      setCautionsText(preset.cautionsText || '');
+      if (preset.footerText) setFooterText(preset.footerText);
+      nextIdRef.current = preset.entries.length + 1;
+      setAppliedPresetKeyword(preset.keyword);
+    } else if (!preset && appliedPresetKeyword) {
+      setAppliedPresetKeyword(null);
+    }
+  }, [title]);
 
   const addEntry = () => {
     setEntries((prev) => [
@@ -282,6 +306,11 @@ function SiegeScheduleForm() {
               자동 채우기
             </button>
           </div>
+          {SIEGE_PRESETS.length > 0 && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
+              제목에 다음 키워드를 포함하면 자동으로 내용이 채워집니다: {SIEGE_PRESETS.map(p => p.keyword).join(', ')}
+            </p>
+          )}
         </div>
 
         <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
