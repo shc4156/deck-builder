@@ -92,10 +92,12 @@ function HighlightToolbar({ onWrap }) {
 
 function SectionListEditor({ sections, setSections, numberOffset = 1 }) {
   const bodyRefs = useRef({});
-  const nextIdRef = useRef(Math.max(0, ...sections.map((s) => s.id)) + 1);
 
   const addSection = () => {
-    setSections((prev) => [...prev, { id: nextIdRef.current++, colorTag: 'y', heading: '', body: '' }]);
+    setSections((prev) => {
+      const nextId = Math.max(0, ...prev.map((s) => s.id)) + 1;
+      return [...prev, { id: nextId, colorTag: 'y', heading: '', body: '' }];
+    });
   };
 
   const removeSection = (id) => {
@@ -181,6 +183,173 @@ function buildSectionBlocks(sections, numberOffset = 1) {
         : `{${s.colorTag}}${num}. ${s.heading}{${s.colorTag}}`;
       return [headingLine, s.body].filter(Boolean).join('\n');
     });
+}
+
+// ─────────────────────────────────────────────────────────
+// 범용 프리셋 훅 / UI (전쟁일정, 자유서식에서 공용으로 사용)
+// letter_presets 테이블: { id, template_id, name, content(jsonb) }
+// ─────────────────────────────────────────────────────────
+function useTemplatePresets(templateId, { applyContent, resetFields }) {
+  const [presets, setPresets] = useState([]);
+  const [presetsLoading, setPresetsLoading] = useState(true);
+  const [selectedPresetId, setSelectedPresetId] = useState('new');
+  const [presetName, setPresetName] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setPresetsLoading(true);
+      const { data, error } = await supabase
+        .from('letter_presets')
+        .select('*')
+        .eq('template_id', templateId)
+        .order('created_at', { ascending: true });
+      if (!cancelled) {
+        if (error) {
+          console.error('프리셋 로딩 실패:', error);
+        } else {
+          setPresets(data || []);
+        }
+        setPresetsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [templateId]);
+
+  const handlePresetSelect = (value) => {
+    setSelectedPresetId(value);
+    if (value === 'new') {
+      setPresetName('');
+      resetFields();
+      return;
+    }
+    const found = presets.find((p) => String(p.id) === String(value));
+    if (found) {
+      setPresetName(found.name || '');
+      applyContent(found.content || {});
+    }
+  };
+
+  const handleSavePreset = async (content) => {
+    if (!presetName.trim()) {
+      alert('프리셋 이름을 입력해주세요.');
+      return;
+    }
+    setSaving(true);
+    if (selectedPresetId === 'new') {
+      const { data, error } = await supabase
+        .from('letter_presets')
+        .insert({ template_id: templateId, name: presetName.trim(), content })
+        .select()
+        .single();
+      setSaving(false);
+      if (error) {
+        alert('프리셋 저장에 실패했습니다: ' + error.message);
+        return;
+      }
+      setPresets((prev) => [...prev, data]);
+      setSelectedPresetId(String(data.id));
+      alert('새 프리셋으로 저장했습니다.');
+    } else {
+      const { data, error } = await supabase
+        .from('letter_presets')
+        .update({ name: presetName.trim(), content, updated_at: new Date().toISOString() })
+        .eq('id', selectedPresetId)
+        .select()
+        .single();
+      setSaving(false);
+      if (error) {
+        alert('프리셋 수정에 실패했습니다: ' + error.message);
+        return;
+      }
+      setPresets((prev) => prev.map((p) => (String(p.id) === String(selectedPresetId) ? data : p)));
+      alert('프리셋을 수정했습니다.');
+    }
+  };
+
+  const handleDeletePreset = async () => {
+    if (selectedPresetId === 'new') return;
+    if (!confirm('이 프리셋을 삭제할까요? 되돌릴 수 없습니다.')) return;
+    const { error } = await supabase.from('letter_presets').delete().eq('id', selectedPresetId);
+    if (error) {
+      alert('삭제에 실패했습니다: ' + error.message);
+      return;
+    }
+    setPresets((prev) => prev.filter((p) => String(p.id) !== String(selectedPresetId)));
+    setSelectedPresetId('new');
+    setPresetName('');
+    resetFields();
+  };
+
+  return {
+    presets,
+    presetsLoading,
+    selectedPresetId,
+    presetName,
+    setPresetName,
+    saving,
+    handlePresetSelect,
+    handleSavePreset,
+    handleDeletePreset,
+  };
+}
+
+function PresetBar({ label, presets, presetsLoading, selectedPresetId, presetName, setPresetName, saving, onSelect, onSave, onDelete, namePlaceholder }) {
+  return (
+    <div style={{ marginBottom: '18px' }}>
+      <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>{label || '프리셋'}</label>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <select
+          value={selectedPresetId}
+          onChange={(e) => onSelect(e.target.value)}
+          disabled={presetsLoading}
+          style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', minWidth: '200px' }}
+        >
+          <option value="new">+ 새로 추가하기</option>
+          {presets.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+
+        {selectedPresetId === 'new' && (
+          <input
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            placeholder={namePlaceholder || '새 프리셋 이름'}
+            style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', flex: 1, minWidth: '160px' }}
+          />
+        )}
+
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          style={{ padding: '8px 14px', fontWeight: 'bold', border: '1px solid var(--jade)', color: 'var(--jade)', background: 'transparent', cursor: 'pointer' }}
+        >
+          {saving ? '저장 중...' : selectedPresetId === 'new' ? '프리셋으로 저장' : '변경사항 저장'}
+        </button>
+
+        {selectedPresetId !== 'new' && (
+          <button
+            type="button"
+            onClick={onDelete}
+            style={{ padding: '8px 14px', fontWeight: 'bold', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', cursor: 'pointer' }}
+          >
+            프리셋 삭제
+          </button>
+        )}
+      </div>
+      {presetsLoading && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>프리셋 목록을 불러오는 중...</p>
+      )}
+      {!presetsLoading && selectedPresetId !== 'new' && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
+          아래 내용을 자유롭게 수정한 뒤 "변경사항 저장"을 누르면 이 프리셋에 반영됩니다.
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────
@@ -372,58 +541,18 @@ function SiegeScheduleForm() {
         <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>서신 정보 입력</h3>
 
         {/* 프리셋 선택 / 저장 / 삭제 */}
-        <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>프리셋</label>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <select
-              value={selectedPresetId}
-              onChange={(e) => handlePresetSelect(e.target.value)}
-              disabled={presetsLoading}
-              style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', minWidth: '200px' }}
-            >
-              <option value="new">+ 새로 추가하기</option>
-              {presets.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-
-            {selectedPresetId === 'new' && (
-              <input
-                value={presetName}
-                onChange={(e) => setPresetName(e.target.value)}
-                placeholder="새 프리셋 이름 (예: 완성공성지원)"
-                style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', flex: 1, minWidth: '160px' }}
-              />
-            )}
-
-            <button
-              type="button"
-              onClick={handleSavePreset}
-              disabled={saving}
-              style={{ padding: '8px 14px', fontWeight: 'bold', border: '1px solid var(--jade)', color: 'var(--jade)', background: 'transparent', cursor: 'pointer' }}
-            >
-              {saving ? '저장 중...' : selectedPresetId === 'new' ? '프리셋으로 저장' : '변경사항 저장'}
-            </button>
-
-            {selectedPresetId !== 'new' && (
-              <button
-                type="button"
-                onClick={handleDeletePreset}
-                style={{ padding: '8px 14px', fontWeight: 'bold', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', cursor: 'pointer' }}
-              >
-                프리셋 삭제
-              </button>
-            )}
-          </div>
-          {presetsLoading && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>프리셋 목록을 불러오는 중...</p>
-          )}
-          {!presetsLoading && selectedPresetId !== 'new' && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
-              아래 내용을 자유롭게 수정한 뒤 "변경사항 저장"을 누르면 이 프리셋에 반영됩니다.
-            </p>
-          )}
-        </div>
+        <PresetBar
+          presets={presets}
+          presetsLoading={presetsLoading}
+          selectedPresetId={selectedPresetId}
+          presetName={presetName}
+          setPresetName={setPresetName}
+          saving={saving}
+          onSelect={handlePresetSelect}
+          onSave={handleSavePreset}
+          onDelete={handleDeletePreset}
+          namePlaceholder="새 프리셋 이름 (예: 완성공성지원)"
+        />
 
         <div style={{ marginBottom: '18px' }}>
           <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
@@ -570,6 +699,51 @@ function WarOperationsForm() {
   const closingRef = useRef(null);
   const nextOpIdRef = useRef(2);
 
+  const preset = useTemplatePresets('war_operations', {
+    applyContent: (content) => {
+      setIntroText(content.introText || '');
+      setScheduleHeading(content.scheduleHeading || '작전 일정');
+      setScheduleColorTag(content.scheduleColorTag || 'b');
+      const loadedOps = (content.operations && content.operations.length > 0)
+        ? content.operations.map((o, idx) => ({ id: idx + 1, ...o }))
+        : [{ id: 1, time: '', location: '', objective: '', coord: null, includeCoord: true }];
+      setOperations(loadedOps);
+      nextOpIdRef.current = loadedOps.length + 1;
+      const loadedSections = (content.sections && content.sections.length > 0)
+        ? content.sections.map((s, idx) => ({ id: idx + 1, ...s }))
+        : [
+            { id: 1, colorTag: 'y', heading: '전선 현황', body: '' },
+            { id: 2, colorTag: 'g', heading: '전략 지침', body: '' },
+          ];
+      setSections(loadedSections);
+      setClosingText(content.closingText || '');
+      setAuthor(content.author || '');
+    },
+    resetFields: () => {
+      setIntroText('');
+      setScheduleHeading('작전 일정');
+      setScheduleColorTag('b');
+      setOperations([{ id: 1, time: '', location: '', objective: '', coord: null, includeCoord: true }]);
+      nextOpIdRef.current = 2;
+      setSections([
+        { id: 1, colorTag: 'y', heading: '전선 현황', body: '' },
+        { id: 2, colorTag: 'g', heading: '전략 지침', body: '' },
+      ]);
+      setClosingText('');
+      setAuthor('');
+    },
+  });
+
+  const buildPresetContent = () => ({
+    introText,
+    scheduleHeading,
+    scheduleColorTag,
+    operations: operations.map(({ id, ...rest }) => rest),
+    sections: sections.map(({ id, ...rest }) => rest),
+    closingText,
+    author,
+  });
+
   const addOperation = () => {
     setOperations((prev) => [
       ...prev,
@@ -622,6 +796,19 @@ function WarOperationsForm() {
     <div className="letter-form-layout">
       <div className="scroll-panel" style={{ padding: '24px' }}>
         <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>서신 정보 입력</h3>
+
+        <PresetBar
+          presets={preset.presets}
+          presetsLoading={preset.presetsLoading}
+          selectedPresetId={preset.selectedPresetId}
+          presetName={preset.presetName}
+          setPresetName={preset.setPresetName}
+          saving={preset.saving}
+          onSelect={preset.handlePresetSelect}
+          onSave={() => preset.handleSavePreset(buildPresetContent())}
+          onDelete={preset.handleDeletePreset}
+          namePlaceholder="새 프리셋 이름 (예: 공성전 작전지령)"
+        />
 
         <div style={{ marginBottom: '18px' }}>
           <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
@@ -750,6 +937,31 @@ function SectionLetterForm() {
   const introRef = useRef(null);
   const closingRef = useRef(null);
 
+  const preset = useTemplatePresets('custom_sections', {
+    applyContent: (content) => {
+      setIntroText(content.introText || '');
+      const loadedSections = (content.sections && content.sections.length > 0)
+        ? content.sections.map((s, idx) => ({ id: idx + 1, ...s }))
+        : [{ id: 1, colorTag: 'y', heading: '', body: '' }];
+      setSections(loadedSections);
+      setClosingText(content.closingText || '');
+      setAuthor(content.author || '');
+    },
+    resetFields: () => {
+      setIntroText('');
+      setSections([{ id: 1, colorTag: 'y', heading: '', body: '' }]);
+      setClosingText('');
+      setAuthor('');
+    },
+  });
+
+  const buildPresetContent = () => ({
+    introText,
+    sections: sections.map(({ id, ...rest }) => rest),
+    closingText,
+    author,
+  });
+
   const bodyText = useMemo(() => {
     const sectionBlocks = buildSectionBlocks(sections, 1);
     return [introText, ...sectionBlocks, closingText, author ? `[작성자: ${author}]` : '']
@@ -772,6 +984,19 @@ function SectionLetterForm() {
     <div className="letter-form-layout">
       <div className="scroll-panel" style={{ padding: '24px' }}>
         <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>서신 정보 입력</h3>
+
+        <PresetBar
+          presets={preset.presets}
+          presetsLoading={preset.presetsLoading}
+          selectedPresetId={preset.selectedPresetId}
+          presetName={preset.presetName}
+          setPresetName={preset.setPresetName}
+          saving={preset.saving}
+          onSelect={preset.handlePresetSelect}
+          onSave={() => preset.handleSavePreset(buildPresetContent())}
+          onDelete={preset.handleDeletePreset}
+          namePlaceholder="새 프리셋 이름 (예: 꼬마맹 운영수칙)"
+        />
 
         <div style={{ marginBottom: '18px' }}>
           <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
