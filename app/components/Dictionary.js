@@ -55,8 +55,8 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
 
         {/* 장수도감 */}
         {dictSubTab === 'generals' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '25px', alignItems: 'start' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '14px' }}>
+          <div className="dict-layout">
+  <div className="dict-card-grid">
               {generals.map(gen => (
                 <GeneralCard
                   key={gen.id}
@@ -120,8 +120,8 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
 
         {/* 전법도감 */}
         {dictSubTab === 'tactics' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '25px', alignItems: 'start' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '14px' }}>
+          <div className="dict-layout">
+  <div className="dict-card-grid">
               {tactics.map(t => (
                 <TacticCard
                   key={t.id}
@@ -200,7 +200,7 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
                   <h2 className="classic-heading text-2xl font-bold mb-4">
                     인연 목록 ({completeCount}/{synergyStatus.length}개 결성됨)
                   </h2>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="synergy-grid">
                     {synergyStatus.map(synergy => (
                       <div
                         key={synergy.name}

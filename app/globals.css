@@ -302,3 +302,69 @@ body {
     padding: 0 16px 12px;
   }
 }
+
+.dict-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 25px;
+  align-items: start;
+}
+
+.dict-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .dict-layout {
+    grid-template-columns: 1fr;
+  }
+  .dict-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.synergy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .synergy-grid { grid-template-columns: 1fr; }
+}
+
+.deck-general-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .deck-general-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+.deck-title {
+  width: 65%;
+}
+@media (max-width: 640px) {
+  .deck-title {
+    width: 100%;
+  }
+}
+
+.asset-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+@media (max-width: 640px) {
+  .asset-columns {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}

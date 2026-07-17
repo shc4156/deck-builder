@@ -207,7 +207,7 @@ export default function MatchesPage() {
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
+        <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
           {filteredDecks.map(deck => {
             const { totalPercent, myGenNames, myTactNames } = deck.matchInfo;
             const isStartDeck = deck.deck_type === 'start';
@@ -265,7 +265,7 @@ export default function MatchesPage() {
                 </div>
 
                 {/* 타이틀 왼쪽 패딩을 주어 핀 아이콘과 안 겹치게 조정 */}
-                <h3 className="classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '14px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%', paddingLeft: '35px' }}>
+                <h3 className="deck-title classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '14px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%', paddingLeft: '35px' }}>
                   {deck.tier_name}
                 </h3>
                 
@@ -297,7 +297,7 @@ export default function MatchesPage() {
                   <FormationGridVisual gridData={deck.formation_grid} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '22px' }}>
+                <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
                   {deck.deck_setup.map((gSetup, idx) => {
                     const isGenOwned = myGenNames.includes(gSetup.general_name);
                     const matchedGeneralData = generals.find(g => g.name === gSetup.general_name);

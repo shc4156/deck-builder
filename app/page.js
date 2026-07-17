@@ -88,8 +88,8 @@ export default function MyDeckPage() {
                   현재 실제 막사에 등용된 장수와 확보한 전법들을 정밀히 체크해 주십시오.
                 </p>
 
-                <div className="asset-grid">
-                  <section className="scroll-panel">
+                <div className="asset-columns">
+  <section className="scroll-panel">
                     <h2 className="classic-heading text-2xl font-bold mb-4">
                       보유 장수 선택 ({selectedGenerals.length}명)
                     </h2>
