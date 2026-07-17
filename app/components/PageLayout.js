@@ -17,7 +17,7 @@ export default function PageLayout({ children }) {
       <header className="site-banner" style={{ position: 'relative' }}>
         <div className="header-tools-row">
           {profile?.role === 'admin' ? (
-            <Link href="/admin/letters" className="header-tools-left" style={{
+            <Link href="/admin" className="header-tools-left" style={{
               padding: '6px 16px', border: '1px solid #d4af37', borderRadius: '3px',
               color: '#d4af37', fontSize: '0.85rem', fontWeight: 'bold',
               letterSpacing: '1px', textDecoration: 'none',
