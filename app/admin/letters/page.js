@@ -193,63 +193,88 @@ function buildSectionBlocks(sections, numberOffset = 1) {
 // 템플릿 1. 공성 일정 변경
 // ─────────────────────────────────────────────────────────
 function SiegeScheduleForm() {
-  const [dateLabel, setDateLabel] = useState('7/16');
-  const [title, setTitle] = useState('');
-  const [entries, setEntries] = useState([{ id: 1, time: '', location: '', castleInfo: '', coord: null, includeCoord: false, hasCatapult: false, hasRam: false }]);
+  const [dateLabel, setDateLabel] = useState('null');
+  const [title, setTitle] = useState('null');
+  const [entries, setEntries] = useState([
+    { id: 1, time: '', location: '', castleInfo: '', coord: null, includeCoord: false, hasCatapult: false, hasRam: false },
+  ]);
   const [cautionsText, setCautionsText] = useState('');
-  const [footerText, setFooterText] = useState('바쁘시더라도 공성 시간 확인을 부탁드리며, 오늘도 힘써주시는 맹원 여러분께 진심으로 감사드립니다!');
-  
-  // 프리셋 관련 상태
-  const [presetName, setPresetName] = useState('');
-  const [savedPresets, setSavedPresets] = useState([]);
+  const [footerText, setFooterText] = useState(
+    '바쁘시더라도 공성 시간 확인을 부탁드리며, 오늘도 힘써주시는 맹원 여러분께 진심으로 감사드립니다!'
+  );
   const [copied, setCopied] = useState(false);
+  const [appliedPresetKeyword, setAppliedPresetKeyword] = useState(null);
+  const cautionsRef = useRef(null);
+  const nextIdRef = useRef(2);
 
-  // 컴포넌트 로드 시 로컬 스토리지에서 프리셋 불러오기
+  // 제목에 등록된 프리셋 키워드가 포함되면 자동으로 내용을 채움
   useEffect(() => {
-    const stored = localStorage.getItem('siegePresets');
-    if (stored) setSavedPresets(JSON.parse(stored));
-  }, []);
-
-  const saveCurrentPreset = () => {
-    if (!presetName) return alert("프리셋 이름을 입력하세요.");
-    const newPreset = { name: presetName, entries, cautionsText, footerText };
-    const updated = [...savedPresets, newPreset];
-    setSavedPresets(updated);
-    localStorage.setItem('siegePresets', JSON.stringify(updated));
-    setPresetName('');
-    alert(`'${presetName}' 프리셋이 저장되었습니다.`);
-  };
-
-  const loadPreset = (index) => {
-    const p = savedPresets[index];
-    if (p) {
-      setEntries(p.entries);
-      setCautionsText(p.cautionsText);
-      setFooterText(p.footerText);
+    const preset = findSiegePreset(title);
+    if (preset && preset.keyword !== appliedPresetKeyword) {
+      setEntries(preset.entries.map((e, idx) => ({ id: idx + 1, ...e })));
+      setCautionsText(preset.cautionsText || '');
+      if (preset.footerText) setFooterText(preset.footerText);
+      nextIdRef.current = preset.entries.length + 1;
+      setAppliedPresetKeyword(preset.keyword);
+    } else if (!preset && appliedPresetKeyword) {
+      setAppliedPresetKeyword(null);
     }
+  }, [title]);
+
+  const addEntry = () => {
+    setEntries((prev) => [
+      ...prev,
+      { id: nextIdRef.current++, time: '', location: '', castleInfo: '', coord: null, includeCoord: false, hasCatapult: false, hasRam: false },
+    ]);
   };
 
-  // 기존 로직 (항목 추가/삭제/업데이트)
-  const addEntry = () => setEntries(prev => [...prev, { id: Date.now(), time: '', location: '', castleInfo: '', coord: null, includeCoord: false, hasCatapult: false, hasRam: false }]);
-  const removeEntry = (id) => setEntries(prev => prev.length > 1 ? prev.filter(e => e.id !== id) : prev);
-  const updateEntry = (id, field, value) => setEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
+  const removeEntry = (id) => {
+    setEntries((prev) => (prev.length > 1 ? prev.filter((e) => e.id !== id) : prev));
+  };
+
+  const updateEntry = (id, field, value) => {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)));
+  };
+
+  const applyAutoTitle = () => {
+    setTitle(`${dateLabel}공성일정`);
+  };
 
   const bodyText = useMemo(() => {
-    const scheduleLines = entries.map(e => {
-      const flags = [];
-      if (e.hasCatapult) flags.push('충차');
-      if (e.hasRam) flags.push('투석차');
-      const flagText = flags.length > 0 ? ` (${flags.join('·')} 배치)` : '';
-      return `▶ ${e.time} - ${e.location}${e.castleInfo ? `(${e.castleInfo})` : ''}${flagText}${e.includeCoord && e.coord ? ` [좌표 ${e.coord.x}.${e.coord.y}]` : ''}`;
-    }).join('\n');
+    const scheduleLines = entries
+      .filter((e) => e.time || e.location || e.castleInfo)
+      .map((e) => {
+        const flags = [];
+        if (e.hasCatapult) flags.push('충차');
+        if (e.hasRam) flags.push('투석차');
+        const flagText = flags.length > 0 ? ` (${flags.join('·')} 배치)` : '';
+        const locPart = e.castleInfo ? `${e.location}(${e.castleInfo})` : e.location;
+        const coordText = e.includeCoord && e.coord ? ` [좌표 ${e.coord.x}.${e.coord.y}]` : '';
+        return `▶ ${e.time} - ${locPart}${flagText}${coordText}`;
+      })
+      .join('\n');
 
-    return [`맹원 여러분, ${dateLabel} 공성일정입니다. 아래 시간과 좌표를 확인하여 착오 없으시기 바랍니다.`, '{y}1. 공성 일정{y}', scheduleLines, '{r}2. 주의사항{r}', cautionsText, footerText].join('\n');
+    return [
+      `맹원 여러분, ${dateLabel} 공성 일정입니다. 아래 시간과 좌표를 확인하여 착오 없으시기 바랍니다.`,
+      `{y}1. 공성 일정{y}`,
+      scheduleLines,
+      `{r}2. 주의사항{r}`,
+      cautionsText,
+      footerText,
+    ]
+      .filter(Boolean)
+      .join('\n');
   }, [dateLabel, entries, cautionsText, footerText]);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(`제목: ${title}\n본문:\n${bodyText}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    const fullText = `제목: ${title}\n본문:\n${bodyText}`;
+    try {
+      await navigator.clipboard.writeText(fullText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      alert('복사에 실패했습니다. 아래 미리보기 영역을 직접 드래그해서 복사해주세요.');
+    }
   };
 
   return (
