@@ -260,7 +260,7 @@ function SiegeScheduleForm() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', alignItems: 'start' }}>
+    <div className="letter-form-layout">
       <div className="scroll-panel" style={{ padding: '24px' }}>
         <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>서신 정보 입력</h3>
 
@@ -300,33 +300,33 @@ function SiegeScheduleForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           {entries.map((entry) => (
             <div key={entry.id} style={{ border: '1px solid rgba(184,147,90,0.35)', padding: '12px', backgroundColor: 'var(--paper-soft)' }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input
-                  value={entry.time}
-                  onChange={(e) => updateEntry(entry.id, 'time', e.target.value)}
-                  placeholder="시간 (예: 12:00)"
-                  style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
-                />
-                <div style={{ flex: 1 }}>
-                  <CastleLocationInput
-                    name={entry.location}
-                    onNameChange={(v) => updateEntry(entry.id, 'location', v)}
-                    coord={entry.coord}
-                    onCoordChange={(c) => updateEntry(entry.id, 'coord', c)}
-                  />
-                </div>
-                <input
-                  value={entry.castleInfo}
-                  onChange={(e) => updateEntry(entry.id, 'castleInfo', e.target.value)}
-                  placeholder="성 정보 (예: 6성, 11관문)"
-                  style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
-                />
-                {entries.length > 1 && (
-                  <button type="button" onClick={() => removeEntry(entry.id)} style={{ padding: '6px 10px', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', cursor: 'pointer' }}>
-                    삭제
-                  </button>
-                )}
-              </div>
+              <div className="entry-row">
+  <input
+    value={entry.time}
+    onChange={(e) => updateEntry(entry.id, 'time', e.target.value)}
+    placeholder="시간 (예: 12:00)"
+    style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
+  />
+  <div style={{ flex: 1 }}>
+    <CastleLocationInput
+      name={entry.location}
+      onNameChange={(v) => updateEntry(entry.id, 'location', v)}
+      coord={entry.coord}
+      onCoordChange={(c) => updateEntry(entry.id, 'coord', c)}
+    />
+  </div>
+  <input
+    value={entry.castleInfo}
+    onChange={(e) => updateEntry(entry.id, 'castleInfo', e.target.value)}
+    placeholder="성 정보 (예: 6성, 11관문)"
+    style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
+  />
+  {entries.length > 1 && (
+    <button type="button" onClick={() => removeEntry(entry.id)} style={{ padding: '6px 10px', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', cursor: 'pointer' }}>
+      삭제
+    </button>
+  )}
+</div>
               <div style={{ display: 'flex', gap: '16px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={entry.hasCatapult} onChange={(e) => updateEntry(entry.id, 'hasCatapult', e.target.checked)} />
@@ -446,7 +446,7 @@ function WarOperationsForm() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', alignItems: 'start' }}>
+    <div className="letter-form-layout">
       <div className="scroll-panel" style={{ padding: '24px' }}>
         <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>서신 정보 입력</h3>
 
@@ -494,14 +494,14 @@ function WarOperationsForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           {operations.map((op) => (
             <div key={op.id} style={{ border: '1px solid rgba(184,147,90,0.35)', padding: '12px', backgroundColor: 'var(--paper-soft)' }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <div className="entry-row">
                 <input
                   value={op.time}
                   onChange={(e) => updateOperation(op.id, 'time', e.target.value)}
                   placeholder="시간 (예: 13:00)"
                   style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
-                />
-                <div style={{ flex: 1 }}>
+  />
+  <div style={{ flex: 1 }}>
                   <CastleLocationInput
                     name={op.location}
                     onNameChange={(v) => updateOperation(op.id, 'location', v)}
@@ -596,7 +596,7 @@ function SectionLetterForm() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', alignItems: 'start' }}>
+    <div className="letter-form-layout">
       <div className="scroll-panel" style={{ padding: '24px' }}>
         <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>서신 정보 입력</h3>
 
@@ -659,7 +659,7 @@ function SectionLetterForm() {
 
 function LetterPreview({ title, bodyText, copied, onCopy }) {
   return (
-    <div className="scroll-panel" style={{ padding: '24px', position: 'sticky', top: '20px' }}>
+    <div className="scroll-panel letter-preview-panel" style={{ padding: '24px', position: 'sticky', top: '20px' }}>
       <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>미리보기</h3>
 
       <div style={{ marginBottom: '10px' }}>

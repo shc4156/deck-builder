@@ -368,3 +368,52 @@ body {
     gap: 20px;
   }
 }
+
+.letter-form-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .letter-form-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.letter-form-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .letter-form-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.entry-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .entry-row {
+    flex-direction: column;
+  }
+  .entry-row input {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .letter-preview-panel {
+    position: static !important;
+  }
+}
