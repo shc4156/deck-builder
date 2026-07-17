@@ -88,12 +88,12 @@ export default function MyDeckPage() {
                   현재 실제 막사에 등용된 장수와 확보한 전법들을 정밀히 체크해 주십시오.
                 </p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                <div className="asset-grid">
                   <section className="scroll-panel">
                     <h2 className="classic-heading text-2xl font-bold mb-4">
                       보유 장수 선택 ({selectedGenerals.length}명)
                     </h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '12px' }}>
+                    <div className="asset-grid">
                       {generals.map(gen => (
                         <button
                           key={gen.id}
@@ -120,7 +120,7 @@ export default function MyDeckPage() {
                     <h2 className="classic-heading text-2xl font-bold mb-4">
                       보유 전법 선택 ({selectedTactics.length}개)
                     </h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '12px' }}>
+                    <div className="asset-grid">
                       {tactics.map(t => (
                         <button
                           key={t.id}

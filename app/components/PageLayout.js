@@ -15,32 +15,25 @@ export default function PageLayout({ children }) {
   return (
     <div style={{ minHeight: '100vh' }}>
       <header className="site-banner" style={{ position: 'relative' }}>
-  {/* 왼쪽 상단: 지휘부 도구 */}
-  {profile?.role === 'admin' && (
-    <Link
-      href="/admin/letters"
-      style={{
-        position: 'absolute', top: '18px', left: '24px',
-        padding: '6px 16px', border: '1px solid #d4af37', borderRadius: '3px',
-        color: '#d4af37', fontSize: '0.85rem', fontWeight: 'bold',
-        letterSpacing: '1px', textDecoration: 'none',
-        backgroundColor: 'rgba(212,175,55,0.08)'
-      }}
-    >
-      ⚔ 지휘부 도구
-    </Link>
-  )}
+        <div className="header-tools-row">
+          {profile?.role === 'admin' ? (
+            <Link href="/admin/letters" className="header-tools-left" style={{
+              padding: '6px 16px', border: '1px solid #d4af37', borderRadius: '3px',
+              color: '#d4af37', fontSize: '0.85rem', fontWeight: 'bold',
+              letterSpacing: '1px', textDecoration: 'none',
+              backgroundColor: 'rgba(212,175,55,0.08)'
+            }}>
+              ⚔ 지휘부 도구
+            </Link>
+          ) : <span />}
 
-  {/* 오른쪽 상단: 계정 전환 + 로그아웃 */}
-  <div style={{
-    position: 'absolute', top: '18px', right: '24px',
-    display: 'flex', gap: '10px', alignItems: 'center'
-  }}>
-    <AccountSwitcher />
-    <button onClick={handleLogout} style={{ /* 기존 스타일 그대로 */ }}>
-      로그아웃
-    </button>
-  </div>
+          <div className="header-tools-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <AccountSwitcher />
+            <button onClick={handleLogout} style={{ /* 기존 스타일 그대로 */ }}>
+              로그아웃
+            </button>
+          </div>
+        </div>
 
         <div className="site-banner-titlerow">
           <span className="site-banner-ornament" />

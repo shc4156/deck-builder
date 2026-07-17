@@ -262,3 +262,43 @@ body {
   background: var(--seal);
   transform: rotate(45deg);
 }
+
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .asset-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+}
+
+.header-tools-left,
+.header-tools-right {
+  position: absolute;
+  top: 18px;
+}
+.header-tools-left { left: 24px; }
+.header-tools-right { right: 24px; }
+
+@media (max-width: 640px) {
+  .site-banner { padding-top: 70px; }
+
+  .header-tools-left,
+  .header-tools-right {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+  }
+
+  .header-tools-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px 12px;
+  }
+}
