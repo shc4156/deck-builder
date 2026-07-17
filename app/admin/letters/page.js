@@ -38,7 +38,6 @@ function CharCounter({ current, limit }) {
   );
 }
 
-// 선택된 텍스트를 {tag}...{tag} 로 감싸는 공통 로직 (여러 textarea에서 재사용)
 function wrapTextSelection(el, value, setValue, tag) {
   if (!el) return;
   const start = el.selectionStart;
@@ -66,7 +65,7 @@ function HighlightToolbar({ onWrap }) {
         <button
           key={tag}
           type="button"
-          onMouseDown={(e) => e.preventDefault()} // 버튼 클릭 시 textarea 선택영역이 풀리지 않도록
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => onWrap(tag)}
           style={{
             padding: '5px 12px',
@@ -88,11 +87,6 @@ function HighlightToolbar({ onWrap }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────
-// 재사용 컴포넌트: 자유 섹션 목록 편집기
-// (소제목 + 강조색 + 본문) 형태의 섹션을 추가/삭제/순서변경.
-// '자유 형식 서신'과 '전쟁 일정·전선·전략' 템플릿에서 공통으로 사용.
-// ─────────────────────────────────────────────────────────
 function SectionListEditor({ sections, setSections, numberOffset = 1 }) {
   const bodyRefs = useRef({});
   const nextIdRef = useRef(Math.max(0, ...sections.map((s) => s.id)) + 1);
@@ -132,7 +126,7 @@ function SectionListEditor({ sections, setSections, numberOffset = 1 }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {sections.map((section, idx) => (
           <div key={section.id} style={{ border: '1px solid rgba(184,147,90,0.35)', padding: '12px', backgroundColor: 'var(--paper-soft)' }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+            <div className="section-heading-row" style={{ marginBottom: '8px' }}>
               <span style={{ fontWeight: 'bold', color: 'var(--seal-dark)', minWidth: '24px' }}>{idx + numberOffset}.</span>
               <select
                 value={section.colorTag}
@@ -301,32 +295,32 @@ function SiegeScheduleForm() {
           {entries.map((entry) => (
             <div key={entry.id} style={{ border: '1px solid rgba(184,147,90,0.35)', padding: '12px', backgroundColor: 'var(--paper-soft)' }}>
               <div className="entry-row">
-  <input
-    value={entry.time}
-    onChange={(e) => updateEntry(entry.id, 'time', e.target.value)}
-    placeholder="시간 (예: 12:00)"
-    style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
-  />
-  <div style={{ flex: 1 }}>
-    <CastleLocationInput
-      name={entry.location}
-      onNameChange={(v) => updateEntry(entry.id, 'location', v)}
-      coord={entry.coord}
-      onCoordChange={(c) => updateEntry(entry.id, 'coord', c)}
-    />
-  </div>
-  <input
-    value={entry.castleInfo}
-    onChange={(e) => updateEntry(entry.id, 'castleInfo', e.target.value)}
-    placeholder="성 정보 (예: 6성, 11관문)"
-    style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
-  />
-  {entries.length > 1 && (
-    <button type="button" onClick={() => removeEntry(entry.id)} style={{ padding: '6px 10px', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', cursor: 'pointer' }}>
-      삭제
-    </button>
-  )}
-</div>
+                <input
+                  value={entry.time}
+                  onChange={(e) => updateEntry(entry.id, 'time', e.target.value)}
+                  placeholder="시간 (예: 12:00)"
+                  style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
+                />
+                <div style={{ flex: 1 }}>
+                  <CastleLocationInput
+                    name={entry.location}
+                    onNameChange={(v) => updateEntry(entry.id, 'location', v)}
+                    coord={entry.coord}
+                    onCoordChange={(c) => updateEntry(entry.id, 'coord', c)}
+                  />
+                </div>
+                <input
+                  value={entry.castleInfo}
+                  onChange={(e) => updateEntry(entry.id, 'castleInfo', e.target.value)}
+                  placeholder="성 정보 (예: 6성, 11관문)"
+                  style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
+                />
+                {entries.length > 1 && (
+                  <button type="button" onClick={() => removeEntry(entry.id)} style={{ padding: '6px 10px', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', cursor: 'pointer' }}>
+                    삭제
+                  </button>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '16px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={entry.hasCatapult} onChange={(e) => updateEntry(entry.id, 'hasCatapult', e.target.checked)} />
@@ -376,7 +370,6 @@ function SiegeScheduleForm() {
 
 // ─────────────────────────────────────────────────────────
 // 템플릿 2. 전쟁 일정 · 전선 · 전략
-// 좌표가 필요한 작전 일정 목록 + 전선 현황/전략 등 자유 섹션을 함께 다룸
 // ─────────────────────────────────────────────────────────
 function WarOperationsForm() {
   const [title, setTitle] = useState('');
@@ -473,7 +466,7 @@ function WarOperationsForm() {
           />
         </div>
 
-        <div style={{ marginBottom: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="section-heading-row" style={{ marginBottom: '10px' }}>
           <span style={{ fontWeight: 'bold', color: 'var(--seal-dark)', minWidth: '24px' }}>1.</span>
           <select value={scheduleColorTag} onChange={(e) => setScheduleColorTag(e.target.value)} style={{ padding: '6px', border: '1px solid rgba(184,147,90,0.4)' }}>
             <option value="none">강조 없음</option>
@@ -500,8 +493,8 @@ function WarOperationsForm() {
                   onChange={(e) => updateOperation(op.id, 'time', e.target.value)}
                   placeholder="시간 (예: 13:00)"
                   style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
-  />
-  <div style={{ flex: 1 }}>
+                />
+                <div style={{ flex: 1 }}>
                   <CastleLocationInput
                     name={op.location}
                     onNameChange={(v) => updateOperation(op.id, 'location', v)}
