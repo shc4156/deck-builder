@@ -8,6 +8,7 @@ import { useDeckAssets } from '../hooks/useDeckAssets';
 import Dictionary from './components/Dictionary';
 import { recommendFullSquads } from './lib/squadRecommendation';
 import { matchFormationInfo } from '../data/synergies';
+import ScreenshotChecker from './components/ScreenshotChecker';
 
 export default function MyDeckPage() {
   const {
@@ -87,6 +88,15 @@ export default function MyDeckPage() {
                 <p style={{ color: 'var(--gold-soft)', marginBottom: '30px', fontSize: '1rem', fontWeight: 500 }}>
                   현재 실제 막사에 등용된 장수와 확보한 전법들을 정밀히 체크해 주십시오.
                 </p>
+
+                <ScreenshotChecker
+  generals={generals}
+  tactics={tactics}
+  selectedGenerals={selectedGenerals}
+  selectedTactics={selectedTactics}
+  toggleGeneral={toggleGeneral}
+  toggleTactic={toggleTactic}
+/>
 
                 <div className="asset-columns">
   <section className="scroll-panel">

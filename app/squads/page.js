@@ -223,14 +223,16 @@ export default function AutoSquadsPage() {
                             <div style={{ borderTop: '2px dashed rgba(184,147,90,0.4)', paddingTop: '10px', marginBottom: '4px' }}>
                               <div style={{ fontSize: '0.85rem', color: 'var(--ink-text)', fontWeight: 'bold', marginBottom: '6px' }}>최적 병법 세팅</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                <div style={{ padding: '4px 8px', fontSize: '0.85rem', backgroundColor: 'rgba(184,147,90,0.18)', border: '2px solid var(--gold)', color: 'var(--seal-dark)', fontWeight: 'bold', width: 'fit-content' }}>
-                                  고유: {gSetup.arts_of_war?.unique}
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                  {gSetup.arts_of_war?.common.map((warName, wIdx) => (
-                                    <span key={wIdx} className="recommend-tag" style={{ fontSize: '0.82rem' }}>{warName}</span>
-                                  ))}
-                                </div>
+                                {gSetup.arts_of_war?.unique && (
+  <div style={{ padding: '4px 8px', fontSize: '0.85rem', backgroundColor: 'rgba(184,147,90,0.18)', border: '2px solid var(--gold)', color: 'var(--seal-dark)', fontWeight: 'bold', width: 'fit-content' }}>
+    고유: {gSetup.arts_of_war.unique}
+  </div>
+)}
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+  {gSetup.arts_of_war?.common?.map((warName, wIdx) => (
+    <span key={wIdx} className="recommend-tag" style={{ fontSize: '0.82rem' }}>{warName}</span>
+  ))}
+</div>
                               </div>
                             </div>
                           </div>

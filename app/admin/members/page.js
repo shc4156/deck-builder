@@ -1,6 +1,6 @@
 // app/admin/members/page.js
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';  // useEffect 추가
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import PageLayout from '../../components/PageLayout';
@@ -114,6 +114,10 @@ export default function MemberManagementPage() {
       setWeeklyStats(data);
     }
   };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   // 주차 목록 (최신순, 최대 3개만 연속성 판단에 사용)
   const weekLabels = [...new Set(weeklyStats.map((r) => r.week_label))].sort().reverse();
