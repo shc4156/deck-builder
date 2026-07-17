@@ -1,0 +1,264 @@
+/* ============================================
+   삼국지 천하결전 — 클래식 리디자인 토큰
+   기존 globals.css 맨 위(또는 맨 아래)에 이어붙이세요.
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Song+Myung&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
+:root {
+  /* 팔레트 */
+  --ink-bg: #1c1815;        /* 묵청 — 전체 배경 */
+  --ink-bg-soft: #241f1a;   /* 배경 그라데이션 보조 */
+  --paper: #e8dcc0;         /* 고지 — 패널/카드 배경 */
+  --paper-soft: #f2e9d4;    /* 패널 안쪽 강조 영역 */
+  --seal: #a6322a;          /* 주칠 — 강조/선택 */
+  --seal-dark: #7c2521;
+  --gold: #b8935a;          /* 금박 — 테두리/제목 */
+  --gold-soft: #d9bd8a;
+  --ink-text: #2b2318;      /* 묵먹 — 본문 텍스트(고지 위) */
+  --paper-text: #e8dcc0;    /* 묵청 배경 위의 밝은 텍스트 */
+
+  --font-display: 'Song Myung', serif;
+  --font-body: 'Pretendard', -apple-system, sans-serif;
+}
+
+body {
+  background: radial-gradient(ellipse at 50% -10%, var(--ink-bg-soft) 0%, var(--ink-bg) 60%);
+  font-family: var(--font-body);
+  color: var(--paper-text);
+}
+
+.classic-title {
+  font-family: var(--font-display);
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+
+/* 두루마리 축 느낌의 탭 바 */
+.classic-tabbar {
+  display: flex;
+  gap: 8px;
+  background: linear-gradient(180deg, var(--ink-bg-soft), var(--ink-bg));
+  border-bottom: 2px solid var(--gold);
+  padding: 8px 4px;
+}
+
+.classic-tab {
+  position: relative;
+  padding: 12px 24px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(184, 147, 90, 0.35);
+  background: rgba(232, 220, 192, 0.04);
+  cursor: pointer;
+  color: var(--gold-soft);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.classic-tab:hover {
+  background: rgba(184, 147, 90, 0.15);
+  color: var(--paper-soft);
+  text-decoration: none;
+}
+
+.classic-tab.active {
+  color: var(--paper-soft);
+  background: var(--seal);
+  border-color: var(--seal);
+}
+
+/* 활성 탭 위의 작은 인장(도장) 마커 */
+.classic-tab.active::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7px;
+  height: 7px;
+  background: var(--gold);
+  border-radius: 1px;
+}
+
+/* 표구(表具) 느낌의 코너 장식이 있는 패널 */
+.scroll-panel {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid rgba(43, 35, 24, 0.15);
+  padding: 22px;
+  color: var(--ink-text);
+}
+
+.scroll-panel::before,
+.scroll-panel::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--gold);
+  pointer-events: none;
+}
+
+.scroll-panel::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.scroll-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+.classic-heading {
+  font-family: var(--font-display);
+  color: var(--seal-dark);
+}
+
+/* 주요 액션 버튼 */
+.seal-button {
+  font-family: var(--font-body);
+  font-weight: 700;
+  background: var(--seal);
+  color: var(--paper-soft);
+  border: none;
+  padding: 15px 34px;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  transition: background 0.2s ease;
+}
+
+.seal-button:hover:not(:disabled) {
+  background: var(--seal-dark);
+}
+
+.seal-button:disabled {
+  background: #6b5d4f;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   Dictionary.js용 추가 토큰 — globals-additions.css 뒤에 이어붙이세요.
+   ============================================ */
+
+:root {
+  --jade: #3f5d54;
+}
+
+.classic-subtab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 25px;
+}
+
+.classic-subtab {
+  padding: 10px 20px;
+  border: 1px solid var(--gold);
+  background: transparent;
+  color: var(--gold-soft);
+  font-family: var(--font-body);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.classic-subtab:hover:not(.active) {
+  background: rgba(184, 147, 90, 0.15);
+}
+
+.classic-subtab.active {
+  background: var(--seal);
+  border-color: var(--seal);
+  color: var(--paper-soft);
+}
+
+.role-badge {
+  display: inline-block;
+  margin: 6px 0 14px 0;
+  padding: 4px 12px;
+  background: var(--seal);
+  color: var(--paper-soft);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.recommend-tag {
+  padding: 4px 10px;
+  background: rgba(63, 93, 84, 0.12);
+  border: 1px solid var(--jade);
+  color: var(--jade);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.synergy-card {
+  padding: 18px;
+  background: var(--paper-soft);
+  border: 1px solid rgba(43, 35, 24, 0.12);
+  border-left: 6px solid rgba(184, 147, 90, 0.4);
+  opacity: 0.65;
+  transition: all 0.2s ease;
+}
+
+.synergy-card.complete {
+  background: #fbf6e8;
+  border-left: 6px solid var(--seal);
+  opacity: 1;
+  box-shadow: 0 2px 8px rgba(166, 50, 42, 0.12);
+}
+
+/* ============================================
+   PageLayout.js용 추가 토큰 — dictionary-additions.css 뒤에 이어붙이세요.
+   ============================================ */
+
+.site-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 0 16px 0;
+  border-bottom: 2px solid var(--gold);
+  background: linear-gradient(180deg, var(--ink-bg-soft), var(--ink-bg));
+}
+
+.site-banner-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.site-banner-title {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+  margin: 0;
+}
+
+.site-banner-subtitle {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--gold-soft);
+  opacity: 0.85;
+  margin: 0;
+}
+
+.site-banner-ornament {
+  width: 8px;
+  height: 8px;
+  background: var(--seal);
+  transform: rotate(45deg);
+}
