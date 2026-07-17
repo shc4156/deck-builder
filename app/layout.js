@@ -1,6 +1,7 @@
 import './globals.css';
 import AuthGuard from './components/AuthGuard';
 import { ProfileProvider } from './components/ProfileContext';
+import InstallBanner from './components/InstallBanner';
 
 export const metadata = {
   title: '천하결전 덱 빌더',
@@ -20,6 +21,7 @@ export default function RootLayout({ children }) {
       <body>
         <AuthGuard>
           <ProfileProvider>{children}</ProfileProvider>
+          <InstallBanner />
         </AuthGuard>
       </body>
     </html>
