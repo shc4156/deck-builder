@@ -4,6 +4,8 @@ import { useState, useRef, useMemo, useEffect } from 'react';
 import PageLayout from '../../components/PageLayout';
 import CastleLocationInput from '../../components/CastleLocationInput';
 import Link from 'next/link';
+// ⚠️ 프로젝트에 이미 Supabase 클라이언트 파일이 있다면 경로를 그 파일에 맞게 수정해주세요.
+import { supabase } from '../../lib/supabaseClient';
 
 // ─────────────────────────────────────────────────────────
 // 서신 템플릿 레지스트리
@@ -24,18 +26,10 @@ const HIGHLIGHT_TAGS = [
   { tag: 'g', label: '초록', color: '#2e7d32' },
 ];
 
-// ─────────────────────────────────────────────────────────
-// 공성 일정 자동 채우기 프리셋
-// title에 keyword가 포함되면 해당 프리셋 내용으로 자동 채워집니다.
-// 새 프리셋을 추가하려면 이 배열에 객체 하나만 추가하면 됩니다.
-// 예: { keyword: '완성공성지원', entries: [...], cautionsText: '...', footerText: '...' }
-// ─────────────────────────────────────────────────────────
-const SIEGE_PRESETS = [
-  // 아직 등록된 프리셋 없음 — 필요할 때 여기에 추가
-];
+const DEFAULT_INTRO = '맹원 여러분, {날짜} 공성 일정입니다. 아래 시간과 좌표를 확인하여 착오 없으시기 바랍니다.';
 
-function findSiegePreset(title) {
-  return SIEGE_PRESETS.find((p) => title.includes(p.keyword));
+function emptyEntry(id) {
+  return { id, time: '', location: '', castleInfo: '', coord: null, includeCoord: false, hasCatapult: false, hasRam: false };
 }
 
 function CharCounter({ current, limit }) {
@@ -190,42 +184,139 @@ function buildSectionBlocks(sections, numberOffset = 1) {
 }
 
 // ─────────────────────────────────────────────────────────
-// 템플릿 1. 공성 일정 변경
+// 템플릿 1. 공성 일정 변경 (Supabase 프리셋 연동)
 // ─────────────────────────────────────────────────────────
 function SiegeScheduleForm() {
-  const [dateLabel, setDateLabel] = useState('null');
-  const [title, setTitle] = useState('null');
-  const [entries, setEntries] = useState([
-    { id: 1, time: '', location: '', castleInfo: '', coord: null, includeCoord: false, hasCatapult: false, hasRam: false },
-  ]);
+  // 프리셋 관련 상태
+  const [presets, setPresets] = useState([]);
+  const [presetsLoading, setPresetsLoading] = useState(true);
+  const [selectedPresetId, setSelectedPresetId] = useState('new');
+  const [presetName, setPresetName] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // 서신 내용 상태
+  const [dateLabel, setDateLabel] = useState('');
+  const [title, setTitle] = useState('');
+  const [introText, setIntroText] = useState(DEFAULT_INTRO);
+  const [entries, setEntries] = useState([emptyEntry(1)]);
   const [cautionsText, setCautionsText] = useState('');
   const [footerText, setFooterText] = useState(
     '바쁘시더라도 공성 시간 확인을 부탁드리며, 오늘도 힘써주시는 맹원 여러분께 진심으로 감사드립니다!'
   );
   const [copied, setCopied] = useState(false);
-  const [appliedPresetKeyword, setAppliedPresetKeyword] = useState(null);
+
+  const introRef = useRef(null);
   const cautionsRef = useRef(null);
   const nextIdRef = useRef(2);
 
-  // 제목에 등록된 프리셋 키워드가 포함되면 자동으로 내용을 채움
+  // 프리셋 목록 불러오기
   useEffect(() => {
-    const preset = findSiegePreset(title);
-    if (preset && preset.keyword !== appliedPresetKeyword) {
-      setEntries(preset.entries.map((e, idx) => ({ id: idx + 1, ...e })));
-      setCautionsText(preset.cautionsText || '');
-      if (preset.footerText) setFooterText(preset.footerText);
-      nextIdRef.current = preset.entries.length + 1;
-      setAppliedPresetKeyword(preset.keyword);
-    } else if (!preset && appliedPresetKeyword) {
-      setAppliedPresetKeyword(null);
+    let cancelled = false;
+    (async () => {
+      setPresetsLoading(true);
+      const { data, error } = await supabase
+        .from('siege_presets')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (!cancelled) {
+        if (error) {
+          console.error('프리셋 로딩 실패:', error);
+        } else {
+          setPresets(data || []);
+        }
+        setPresetsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const applyPresetToForm = (preset) => {
+    const loadedEntries = (preset.entries && preset.entries.length > 0)
+      ? preset.entries.map((e, idx) => ({ id: idx + 1, ...e }))
+      : [emptyEntry(1)];
+    setEntries(loadedEntries);
+    nextIdRef.current = loadedEntries.length + 1;
+    setIntroText(preset.intro_text || DEFAULT_INTRO);
+    setCautionsText(preset.cautions_text || '');
+    if (preset.footer_text) setFooterText(preset.footer_text);
+    setPresetName(preset.name || '');
+  };
+
+  const handlePresetSelect = (value) => {
+    setSelectedPresetId(value);
+    if (value === 'new') {
+      setPresetName('');
+      setEntries([emptyEntry(1)]);
+      nextIdRef.current = 2;
+      setIntroText(DEFAULT_INTRO);
+      setCautionsText('');
+      return;
     }
-  }, [title]);
+    const preset = presets.find((p) => String(p.id) === String(value));
+    if (preset) applyPresetToForm(preset);
+  };
+
+  const buildPresetPayload = () => ({
+    name: presetName.trim(),
+    intro_text: introText,
+    entries: entries.map(({ id, ...rest }) => rest),
+    cautions_text: cautionsText,
+    footer_text: footerText,
+  });
+
+  const handleSavePreset = async () => {
+    if (!presetName.trim()) {
+      alert('프리셋 이름을 입력해주세요.');
+      return;
+    }
+    setSaving(true);
+    const payload = buildPresetPayload();
+
+    if (selectedPresetId === 'new') {
+      const { data, error } = await supabase
+        .from('siege_presets')
+        .insert(payload)
+        .select()
+        .single();
+      setSaving(false);
+      if (error) {
+        alert('프리셋 저장에 실패했습니다: ' + error.message);
+        return;
+      }
+      setPresets((prev) => [...prev, data]);
+      setSelectedPresetId(String(data.id));
+      alert('새 프리셋으로 저장했습니다.');
+    } else {
+      const { data, error } = await supabase
+        .from('siege_presets')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', selectedPresetId)
+        .select()
+        .single();
+      setSaving(false);
+      if (error) {
+        alert('프리셋 수정에 실패했습니다: ' + error.message);
+        return;
+      }
+      setPresets((prev) => prev.map((p) => (String(p.id) === String(selectedPresetId) ? data : p)));
+      alert('프리셋을 수정했습니다.');
+    }
+  };
+
+  const handleDeletePreset = async () => {
+    if (selectedPresetId === 'new') return;
+    if (!confirm('이 프리셋을 삭제할까요? 되돌릴 수 없습니다.')) return;
+    const { error } = await supabase.from('siege_presets').delete().eq('id', selectedPresetId);
+    if (error) {
+      alert('삭제에 실패했습니다: ' + error.message);
+      return;
+    }
+    setPresets((prev) => prev.filter((p) => String(p.id) !== String(selectedPresetId)));
+    handlePresetSelect('new');
+  };
 
   const addEntry = () => {
-    setEntries((prev) => [
-      ...prev,
-      { id: nextIdRef.current++, time: '', location: '', castleInfo: '', coord: null, includeCoord: false, hasCatapult: false, hasRam: false },
-    ]);
+    setEntries((prev) => [...prev, emptyEntry(nextIdRef.current++)]);
   };
 
   const removeEntry = (id) => {
@@ -234,10 +325,6 @@ function SiegeScheduleForm() {
 
   const updateEntry = (id, field, value) => {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)));
-  };
-
-  const applyAutoTitle = () => {
-    setTitle(`${dateLabel}공성일정`);
   };
 
   const bodyText = useMemo(() => {
@@ -254,8 +341,10 @@ function SiegeScheduleForm() {
       })
       .join('\n');
 
+    const resolvedIntro = (introText || '').split('{날짜}').join(dateLabel || '');
+
     return [
-      `맹원 여러분, ${dateLabel} 공성 일정입니다. 아래 시간과 좌표를 확인하여 착오 없으시기 바랍니다.`,
+      resolvedIntro,
       `{y}1. 공성 일정{y}`,
       scheduleLines,
       `{r}2. 주의사항{r}`,
@@ -264,7 +353,7 @@ function SiegeScheduleForm() {
     ]
       .filter(Boolean)
       .join('\n');
-  }, [dateLabel, entries, cautionsText, footerText]);
+  }, [dateLabel, introText, entries, cautionsText, footerText]);
 
   const handleCopy = async () => {
     const fullText = `제목: ${title}\n본문:\n${bodyText}`;
@@ -282,8 +371,64 @@ function SiegeScheduleForm() {
       <div className="scroll-panel" style={{ padding: '24px' }}>
         <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>서신 정보 입력</h3>
 
+        {/* 프리셋 선택 / 저장 / 삭제 */}
         <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>날짜 (본문 인사말에 사용)</label>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>프리셋</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              value={selectedPresetId}
+              onChange={(e) => handlePresetSelect(e.target.value)}
+              disabled={presetsLoading}
+              style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', minWidth: '200px' }}
+            >
+              <option value="new">+ 새로 추가하기</option>
+              {presets.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
+            {selectedPresetId === 'new' && (
+              <input
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="새 프리셋 이름 (예: 완성공성지원)"
+                style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', flex: 1, minWidth: '160px' }}
+              />
+            )}
+
+            <button
+              type="button"
+              onClick={handleSavePreset}
+              disabled={saving}
+              style={{ padding: '8px 14px', fontWeight: 'bold', border: '1px solid var(--jade)', color: 'var(--jade)', background: 'transparent', cursor: 'pointer' }}
+            >
+              {saving ? '저장 중...' : selectedPresetId === 'new' ? '프리셋으로 저장' : '변경사항 저장'}
+            </button>
+
+            {selectedPresetId !== 'new' && (
+              <button
+                type="button"
+                onClick={handleDeletePreset}
+                style={{ padding: '8px 14px', fontWeight: 'bold', border: '1px solid #c0392b', color: '#c0392b', background: 'transparent', cursor: 'pointer' }}
+              >
+                프리셋 삭제
+              </button>
+            )}
+          </div>
+          {presetsLoading && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>프리셋 목록을 불러오는 중...</p>
+          )}
+          {!presetsLoading && selectedPresetId !== 'new' && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
+              아래 내용을 자유롭게 수정한 뒤 "변경사항 저장"을 누르면 이 프리셋에 반영됩니다.
+            </p>
+          )}
+        </div>
+
+        <div style={{ marginBottom: '18px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
+            날짜 (안내문구의 {'{날짜}'} 위치에 반영됩니다)
+          </label>
           <input
             value={dateLabel}
             onChange={(e) => setDateLabel(e.target.value)}
@@ -296,21 +441,27 @@ function SiegeScheduleForm() {
           <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
             제목 <CharCounter current={title.length} limit={TITLE_LIMIT} />
           </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', flex: 1 }}
-            />
-            <button type="button" onClick={applyAutoTitle} style={{ padding: '8px 14px', fontWeight: 'bold', border: '1px solid var(--gold)', background: 'var(--paper-soft)', cursor: 'pointer' }}>
-              자동 채우기
-            </button>
-          </div>
-          {SIEGE_PRESETS.length > 0 && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
-              제목에 다음 키워드를 포함하면 자동으로 내용이 채워집니다: {SIEGE_PRESETS.map(p => p.keyword).join(', ')}
-            </p>
-          )}
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', width: '100%' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '18px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>안내문구 (본문 맨 앞 설명)</label>
+          <HighlightToolbar onWrap={(tag) => wrapTextSelection(introRef.current, introText, setIntroText, tag)} />
+          <textarea
+            ref={introRef}
+            value={introText}
+            onChange={(e) => setIntroText(e.target.value)}
+            placeholder="예: 맹원 여러분, {날짜} 공성 일정입니다..."
+            rows={2}
+            style={{ width: '100%', padding: '10px', border: '1px solid rgba(184,147,90,0.4)', resize: 'vertical', fontFamily: 'inherit' }}
+          />
+          <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
+            문구 안에 <code>{'{날짜}'}</code> 를 넣으면 위에서 입력한 날짜로 자동 치환됩니다.
+          </p>
         </div>
 
         <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -765,7 +916,7 @@ export default function LetterWriterPage() {
         >
           ← 홈으로
         </Link>
-        
+
         <h1 className="classic-heading text-3xl font-bold mb-2">자동 서신 작성</h1>
         <p style={{ color: 'var(--gold-soft)', marginBottom: '24px', fontSize: '1.05rem', fontWeight: 500 }}>
           항목을 입력하면 제목 {TITLE_LIMIT}자 / 본문 {BODY_LIMIT}자 규칙에 맞춰 서신을 자동으로 완성합니다.
