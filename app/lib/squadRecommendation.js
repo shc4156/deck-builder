@@ -1,5 +1,5 @@
 import { pickTierSquads } from './tierSquadMatcher';
-import { buildOptimalSquads, resolveGlobalTactics } from './squadOptimizer';
+import { buildOptimalSquads, resolveGlobalTactics, buildTacticFrequencyMap } from './squadOptimizer';
 
 export function recommendFullSquads(tierDecks, generals, tactics, selectedGenerals, selectedTactics) {
   const ownedGenerals = generals.filter(g => selectedGenerals.includes(g.id));
@@ -24,5 +24,8 @@ export function recommendFullSquads(tierDecks, generals, tactics, selectedGenera
   }
 
   // 3단계: 전체 군을 통틀어 전법 중복 없이 최종 확정 (대체 전법 포함)
-  return resolveGlobalTactics(allSquads, ownedTactics, generals);
+  // tier_decks 실사용 빈도(장수별로 실전에서 가장 자주 같이 쓰인 전법)를 먼저 시도하고,
+  // 없으면 기존 역할 휴리스틱으로 폴백하도록 tacticFrequencyMap을 전달한다.
+  const tacticFrequencyMap = buildTacticFrequencyMap(tierDecks);
+  return resolveGlobalTactics(allSquads, ownedTactics, generals, tacticFrequencyMap);
 }

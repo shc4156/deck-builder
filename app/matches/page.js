@@ -7,6 +7,7 @@ import FormationGridVisual from '../components/FormationGridVisual';
 import GlossaryText from '../components/GlossaryText';
 import GlossaryModal from '../components/GlossaryModal';
 import { getActiveSynergiesFromSetup, matchFormationInfo } from '../../data/synergies';
+import { findAlternativeTactics } from '../../data/tacticAlternatives';
 import { useDeckAssets } from '../../hooks/useDeckAssets';
 import { supabase } from '../lib/supabaseClient'; // Supabase 임포트 확인
 
@@ -38,63 +39,9 @@ export default function MatchesPage() {
     fetchPinnedDecks();
   }, []);
 
-  // 특정 장수에게 추천된 전법이 없을 때, 대체 전법 탐색 함수
-  // role/tags 기반으로 전면 재작성: role 불일치는 후보에서 아예 제외(1차 강제 필터),
-  // 장수 개별 하드코딩(isHealerSporter 등)은 제거하고 primary_role/secondary_roles를 약한 가점으로만 반영
-  const findAlternativeTactics = (generalName, recommendedTacticName, usedTacticsInDeck = [], statFocus = '') => {
-    const targetTactic = tactics.find(t => t.name === recommendedTacticName);
-    if (!targetTactic || !targetTactic.role) return [];
-
-    const targetRole = targetTactic.role;
-    const targetTags = targetTactic.tags || [];
-
-    const myOwnedTactics = tactics.filter(t =>
-      selectedTactics.includes(t.id) &&
-      t.name !== recommendedTacticName &&
-      !usedTacticsInDeck.includes(t.name)
-    );
-
-    const currentGeneral = generals.find(g => g.name === generalName);
-    const generalSecondaryRoles = currentGeneral?.secondary_roles || [];
-
-    // 1차 강제 필터: role이 다르면 애초에 후보가 아님 (대교/황충 사례의 근본 원인이었던 부분)
-    const roleMatched = myOwnedTactics.filter(t => t.role === targetRole);
-
-    const scoreTactic = (t) => {
-      let score = 100; // role이 이미 일치하므로 기본 점수 부여
-      const tTags = t.tags || [];
-
-      // tags 교집합 개수로 세부 궁합 스코어링
-      const sharedTags = tTags.filter(tag => targetTags.includes(tag));
-      score += sharedTags.length * 15;
-
-      // 장수의 부역할(secondary_roles)과 전법 tags가 겹치면 약한 가점만 부여
-      const generalTagOverlap = tTags.filter(tag => generalSecondaryRoles.includes(tag));
-      score += generalTagOverlap.length * 5;
-
-      return score;
-    };
-
-    // 2차: type(지휘/패시브/액티브/추격)이 원본과 같은 발동 슬롯인 후보를 우선 사용
-    // 추격/액티브는 발동 조건 자체가 다른 슬롯이라 섞어 쓰면 실전에서 의미가 없음 → 가점이 아니라 우선순위 그룹으로 분리
-    const typeMatched = roleMatched.filter(t => t.type === targetTactic.type);
-    const typeMismatched = roleMatched.filter(t => t.type !== targetTactic.type);
-
-    const rankedTypeMatched = typeMatched
-      .map(t => ({ tactic: t, score: scoreTactic(t) }))
-      .sort((a, b) => b.score - a.score);
-
-    const rankedTypeMismatched = typeMismatched
-      .map(t => ({ tactic: t, score: scoreTactic(t) }))
-      .sort((a, b) => b.score - a.score);
-
-    // type까지 일치하는 후보를 우선 채우고, 부족할 때만 type이 다른 role 일치 후보로 보충
-    const finalRanked = [...rankedTypeMatched, ...rankedTypeMismatched];
-
-    return finalRanked
-      .map(item => item.tactic.name)
-      .slice(0, 3);
-  };
+  // 대체 전법 탐색은 data/tacticAlternatives.js의 findAlternativeTactics로 공용화됨.
+  // (utils/squadEngine.js의 1-5군 자동편성에서도 동일 함수를 사용 — 매칭 페이지가
+  // 보여주는 "대체 전법 제안"과 실제 스쿼드에 배정되는 전법이 항상 같은 결과를 내도록 통일)
 
   // 핀 토글 및 즉각 업데이트
   const togglePin = async (deckId) => {
@@ -364,7 +311,14 @@ export default function MatchesPage() {
                                     {!isTacticOwnedInProfile && (
                                       <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginTop: '6px', paddingLeft: '6px', fontWeight: 'bold', backgroundColor: 'rgba(166,50,42,0.08)', padding: '4px', borderLeft: '3px solid var(--seal)' }}>
                                         {(() => {
-                                          const alts = findAlternativeTactics(gSetup.general_name, tName, dynamicUsedTactics, gSetup.stat_focus);
+                                          const alts = findAlternativeTactics({
+                                            generalName: gSetup.general_name,
+                                            recommendedTacticName: tName,
+                                            tactics,
+                                            generals,
+                                            selectedTactics,
+                                            usedTacticsInDeck: dynamicUsedTactics,
+                                          });
                                           if (alts.length > 0) {
                                             dynamicUsedTactics.push(alts[0]);
                                             return `대체 전법 제안: ${alts.join(', ')}`;

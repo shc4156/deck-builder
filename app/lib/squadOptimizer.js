@@ -1,10 +1,149 @@
 // app/lib/squadOptimizer.js
 // 인연 발동 + 실제 역할 데이터(roleInference) + 전법 궁합을 고려한 "강한 덱" 자동 편성 로직
+//
+// [변경사항 요약]
+// - deckEngineData(네이버 카페 분석 자료: 장수 역할지수 + 장수간 Connection)를 추가로 import
+// - scoreSynergyForTrio: 기존 SYNERGY_MASTER 매칭 점수 + Connection 기반 점수를 합산하도록 확장
+// - scoreRoleBalance: 기존 inferGeneralRole 기반 그룹 다양성 보너스 + deckEngineData 매크로 역할
+//   (공격/지원/제어) 다양성 보너스를 추가 (기존 로직은 그대로 두고 더하기만 함)
+// - 나머지 함수(전법 매칭, 진형 선택 등)는 원본 그대로 유지
 
 import { SYNERGY_MASTER, FORMATIONS_MASTER } from '../../data/synergies';
 import { inferGeneralRole, inferTacticRole } from '../../data/roleInference';
 import { COMMON_ARTS_MASTER } from '../../data/commonArts';
+import deckEngineData from '../../data/deckEngineData.json'; // ← 신규: 카페 분석 자료
+import { parseTierScore } from './tierSquadMatcher'; // tier_name("T1", "T1+", "T2-" 등) 파싱용 - 빈도 가중치에 재사용
 
+// ─────────────────────────────────────────────────────────────
+// [신규] deckEngineData 기반 lookup 테이블 (모듈 로드 시 1회만 계산)
+// ─────────────────────────────────────────────────────────────
+const MACRO_BY_CATEGORY = {
+  attack_carry: '공격',
+  support_engine: '지원',
+  support_amplifier: '지원',
+  support_sustain: '지원',
+  control_trigger: '제어',
+  control_counter: '제어',
+};
+
+// 장수 이름 -> { macro, role_index } (여러 역할 중 role_index가 가장 높은 것을 대표값으로 사용)
+const GENERAL_MACRO_MAP = (() => {
+  const map = new Map();
+  for (const [category, rows] of Object.entries(deckEngineData.roles)) {
+    for (const r of rows) {
+      const cur = map.get(r.general);
+      if (!cur || r.role_index > cur.role_index) {
+        map.set(r.general, { macro: MACRO_BY_CATEGORY[category], role_index: r.role_index });
+      }
+    }
+  }
+  return map;
+})();
+
+// 정렬된 이름쌍("A|B") -> 누적 연결점수 (leader/follower 양방향 있으면 합산)
+const CONNECTION_SCORE_MAP = (() => {
+  const map = new Map();
+  const key = (a, b) => [a, b].sort().join('|');
+  for (const c of deckEngineData.connections) {
+    const k = key(c.leader, c.follower);
+    map.set(k, (map.get(k) || 0) + c.score);
+  }
+  return map;
+})();
+
+function connectionScoreOf(nameA, nameB) {
+  return CONNECTION_SCORE_MAP.get([nameA, nameB].sort().join('|')) || 0;
+}
+
+// ─────────────────────────────────────────────────────────────
+// [신규] tier_decks 기반 "장수 → 전법" 실사용 빈도 매핑
+//
+// 아이디어: tier_decks는 사람이 실전 검증한 "이 장수에게 실제로 이 전법을 썼다"는
+// 실측 데이터다. inferGeneralRole/inferTacticRole 기반 휴리스틱(scoreTacticForGeneral)보다
+// 신뢰도가 높으므로, 전법 배정 시 이걸 먼저 시도하고 안 되면 휴리스틱으로 폴백한다.
+//
+// 티어 라벨은 별도 컬럼이 아니라 tier_name 문자열 안에 "T1", "T1+", "T2-" 형태로 들어있다
+// (tierSquadMatcher.js의 parseTierScore 참고). 여기서도 동일한 파서를 재사용해서
+// 높은 티어(T1에 가까울수록) 덱일수록 빈도 가중치를 더 크게 준다.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * tier_decks 전체를 스캔해서 "장수 이름 → { 전법이름: 가중합 점수 }" 맵을 만든다.
+ * - added_tactics(그 장수가 실제로 낀 전법)뿐 아니라 alt_tactics(대체옵션)도
+ *   더 낮은 가중치로 반영해서, "이 장수가 잘 쓰던 전법 풀"을 넓게 잡는다.
+ * - 같은 덱 안에서 여러 번 (added + alt) 잡혀도 합산되며, 등장한 덱 수가 많을수록,
+ *   티어가 높을수록(parseTierScore 값이 클수록) 점수가 커진다.
+ * - parseTierScore가 -1(T 표기 없는 개척덱류)을 반환하는 경우, 음수 가중치가 되지 않도록
+ *   최소 가중치(MIN_TIER_WEIGHT)로 클램프한다.
+ *
+ * 모듈 로드 시 한 번이 아니라 tierDecks를 인자로 받아 호출 시점에 계산한다(데이터가 매 요청
+ * 바뀌지 않는다면, 호출부에서 결과를 캐싱해서 재사용하는 걸 권장 — buildTacticFrequencyMap은
+ * 순수 함수라 캐싱하기 쉽다).
+ *
+ * @param {Array} tierDecks
+ * @param {Object} [options]
+ * @param {number} [options.altWeight=0.4] alt_tactics(대체옵션)에 적용할 가중치 배율
+ * @param {number} [options.minCount=1] 최종 후보로 인정할 최소 누적 점수(노이즈 컷)
+ * @returns {Map<string, Map<string, number>>} 장수명 -> (전법명 -> 누적점수) 맵
+ */
+const MIN_TIER_WEIGHT = 0.5; // T 표기 없는 개척덱류(parseTierScore === -1)의 최소 가중치
+
+export function buildTacticFrequencyMap(tierDecks, options = {}) {
+  const { altWeight = 0.4, minCount = 0 } = options;
+  const map = new Map();
+
+  const bump = (generalName, tacticName, amount) => {
+    if (!generalName || !tacticName || tacticName === '미장착') return;
+    if (!map.has(generalName)) map.set(generalName, new Map());
+    const inner = map.get(generalName);
+    inner.set(tacticName, (inner.get(tacticName) || 0) + amount);
+  };
+
+  for (const deck of tierDecks || []) {
+    const rawScore = parseTierScore(deck.tier_name || '');
+    const weight = Math.max(rawScore, MIN_TIER_WEIGHT);
+
+    for (const gSetup of deck.deck_setup || []) {
+      const name = gSetup.general_name?.trim();
+      if (!name) continue;
+
+      (gSetup.added_tactics || []).forEach(t => {
+        if (t) bump(name, t, weight);
+      });
+      (gSetup.alt_tactics || []).forEach(t => {
+        if (t) bump(name, t, weight * altWeight);
+      });
+    }
+  }
+
+  // 노이즈 컷: minCount 미만인 항목 제거
+  if (minCount > 0) {
+    for (const inner of map.values()) {
+      for (const [tacticName, score] of inner) {
+        if (score < minCount) inner.delete(tacticName);
+      }
+    }
+  }
+
+  return map;
+}
+
+/**
+ * 특정 장수에 대해, 빈도 맵 기준으로 "가장 많이 같이 쓰인 전법" 순으로 정렬된
+ * 후보 이름 배열을 반환한다. (보유 여부/중복 사용 여부는 호출부에서 필터링)
+ */
+export function getTopTacticsByFrequency(generalName, tacticFrequencyMap) {
+  const inner = tacticFrequencyMap?.get(generalName);
+  if (!inner || inner.size === 0) return [];
+  return [...inner.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([tacticName]) => tacticName);
+}
+
+// 원본 SYNERGY_MASTER 점수(대략 0~180 스케일)와 스케일을 맞추기 위한 가중치.
+// deck_engine_data의 연결점수는 쌍당 -5~5 수준이라 그대로 더하면 존재감이 없어서 곱해준다.
+// 값이 과하다 싶으면 이 상수만 낮추면 됨.
+const CONNECTION_WEIGHT = 8;
 
 const generateStrategicSquads = (tierDecks, myGensData, myTactData, pinnedDeckIds) => {
   const usedGenerals = new Set();
@@ -19,12 +158,12 @@ const generateStrategicSquads = (tierDecks, myGensData, myTactData, pinnedDeckId
     if (squads.length >= 5) break;
 
     const canUse = deck.deck_setup.every(g => !usedGenerals.has(g.general_name.trim()));
-    
+
     if (canUse) {
       deck.deck_setup.forEach(g => usedGenerals.add(g.general_name.trim()));
-      
+
       // ... (기존 전법/병법 자동 할당 및 객체 생성 로직) ...
-      
+
       squads.push({ ...deck, squadNumber: squads.length + 1 });
     }
   }
@@ -80,8 +219,6 @@ function powerScore(g) {
 // ---------------------------------------------------------------
 // 1. 장수 역할 그룹핑 (진형/밸런스 계산용 - inferGeneralRole 결과를 그대로 신뢰)
 // ---------------------------------------------------------------
-// inferGeneralRole은 ['병기딜','책략딜','힐러','버퍼','디버퍼','탱커','추격형','액티브형'] 등을 반환.
-// 진형/밸런스 판단에는 이 중 대표 성향 하나로 묶어서 사용한다.
 export function primaryGroup(general) {
   const roles = inferGeneralRole(general);
   if (roles.includes('힐러')) return 'support';
@@ -108,11 +245,13 @@ function* combinations3(pool) {
 
 // ---------------------------------------------------------------
 // 3. 트리오 점수 계산 (인연 > 역할 밸런스 > 스탯 총합)
+//    [변경] deckEngineData의 Connection 점수를 추가로 합산
 // ---------------------------------------------------------------
 function scoreSynergyForTrio(trioNames) {
   let score = 0;
   let activeSynergies = [];
 
+  // 기존: 수동 등록된 SYNERGY_MASTER 매칭
   for (const syn of SYNERGY_MASTER) {
     const matched = syn.members.filter(m => trioNames.includes(m)).length;
     if (matched >= syn.req && matched > 0) {
@@ -121,6 +260,16 @@ function scoreSynergyForTrio(trioNames) {
       activeSynergies.push(syn.name);
     }
   }
+
+  // [신규] 카페 분석 자료 기반 Connection 점수 (3개 쌍 전부 확인)
+  const [a, b, c] = trioNames;
+  const connectionRaw =
+    connectionScoreOf(a, b) + connectionScoreOf(b, c) + connectionScoreOf(a, c);
+  if (connectionRaw !== 0) {
+    score += connectionRaw * CONNECTION_WEIGHT;
+    activeSynergies.push(`Connection(${connectionRaw})`);
+  }
+
   return { score, activeSynergies };
 }
 
@@ -130,6 +279,14 @@ function scoreRoleBalance(trio) {
   let bonus = uniqueGroups * 8;
   if (groups.includes('support')) bonus += 10;
   if (groups.includes('tank')) bonus += 6;
+
+  // [신규] deckEngineData 매크로 역할(공격/지원/제어) 다양성 보너스 - 기존 보너스에 소량 가산
+  const macros = trio.map(g => GENERAL_MACRO_MAP.get(g.name)?.macro).filter(Boolean);
+  const distinctMacros = new Set(macros).size;
+  if (distinctMacros === 3) bonus += 6;
+  else if (distinctMacros === 2) bonus += 2;
+  else if (macros.length === 3) bonus -= 4; // 셋 다 같은 매크로 역할이면 소폭 감점
+
   return bonus;
 }
 
@@ -191,11 +348,9 @@ function scoreTacticForGeneral(tactic, general) {
 
   let score = 0;
 
-  // 명백한 상성 불일치는 큰 감점 (물리 딜러에게 순수 책략 전법 등)
   if (gPhys && tMagic && !tPhys) score -= 100;
   if (gMagic && tPhys && !tMagic) score -= 100;
 
-  // 역할 일치 가점
   if (gPhys && tPhys) score += 50;
   if (gMagic && tMagic) score += 50;
   if (gHeal && tHeal) score += 60;
@@ -203,7 +358,6 @@ function scoreTacticForGeneral(tactic, general) {
   if (gDebuff && tDebuff) score += 45;
   if (gTank && tDefense) score += 45;
 
-  // 발동 방식(추격형/액티브형) 일치 가점
   ['추격형', '액티브형'].forEach(tag => {
     if (gRoles.includes(tag) && tRoles.includes(tag)) score += 10;
   });
@@ -212,12 +366,30 @@ function scoreTacticForGeneral(tactic, general) {
 }
 
 /**
- * 특정 장수에게 아직 안 쓰인 보유 전법 중 가장 궁합 좋은 것을 고른다.
+ * 장수 하나에게 배정할 전법을 고른다. 우선순위:
+ *  1. (호출부에서 이미 처리) 이 덱 고유의 원래 추천 전법 — resolveGlobalTactics의 original[i]
+ *  2. [신규] tacticFrequencyMap 기반, 이 장수에게 실전에서 가장 많이 쓰인 전법 (보유 & 미사용인 것 중 1순위)
+ *  3. 기존 역할 휴리스틱(scoreTacticForGeneral) — 1,2 둘 다 실패했을 때만 (신규/희귀 장수 등)
+ *
  * @param {Object} general
- * @param {Array} ownedTactics - 유저가 보유한 tactics row 전체
- * @param {Set} usedTacticNames - 이미 다른 슬롯에서 확정된 전법 이름 (전역 중복 방지)
+ * @param {Array} ownedTactics
+ * @param {Set<string>} usedTacticNames
+ * @param {Map<string, Map<string, number>>} [tacticFrequencyMap] buildTacticFrequencyMap() 결과. 없으면 2단계는 건너뜀.
  */
-export function pickBestTacticForGeneral(general, ownedTactics, usedTacticNames) {
+export function pickBestTacticForGeneral(general, ownedTactics, usedTacticNames, tacticFrequencyMap) {
+  const ownedByName = new Map(ownedTactics.map(t => [t.name, t]));
+
+  // 2단계: 빈도 데이터 기반 우선 시도
+  if (tacticFrequencyMap) {
+    const rankedNames = getTopTacticsByFrequency(general.name, tacticFrequencyMap);
+    for (const name of rankedNames) {
+      if (usedTacticNames.has(name)) continue;
+      const owned = ownedByName.get(name);
+      if (owned) return owned;
+    }
+  }
+
+  // 3단계: 기존 역할 휴리스틱 폴백
   let best = null;
   for (const t of ownedTactics) {
     if (usedTacticNames.has(t.name)) continue;
@@ -229,11 +401,9 @@ export function pickBestTacticForGeneral(general, ownedTactics, usedTacticNames)
 
 // ---------------------------------------------------------------
 // 6. 전체 편성(티어덱 기반 + AI 기반) 확정 후, 1~5군을 순서대로 훑으며
-//    전법을 최종 확정한다: 원래 추천 전법이 있고 보유 & 미사용이면 그대로,
-//    아니면 role 궁합이 가장 좋은 미사용 보유 전법으로 대체.
-//    -> 이 함수가 끝나면 모든 군의 전법이 서로 절대 겹치지 않는다.
+//    전법을 최종 확정한다.
 // ---------------------------------------------------------------
-export function resolveGlobalTactics(squads, ownedTactics, generals) {
+export function resolveGlobalTactics(squads, ownedTactics, generals, tacticFrequencyMap) {
   const used = new Set();
   const ownedNameSet = new Set(ownedTactics.map(t => t.name));
 
@@ -254,7 +424,7 @@ export function resolveGlobalTactics(squads, ownedTactics, generals) {
           continue;
         }
 
-        const alt = general ? pickBestTacticForGeneral(general, ownedTactics, used) : null;
+        const alt = general ? pickBestTacticForGeneral(general, ownedTactics, used, tacticFrequencyMap) : null;
         if (alt) {
           resolvedNames.push(alt.name);
           substituteFlags.push(true);
@@ -275,7 +445,6 @@ export function resolveGlobalTactics(squads, ownedTactics, generals) {
 
 // ---------------------------------------------------------------
 // 7. 메인: 남은 보유 장수 풀에서 5군(또는 남은 슬롯 수)까지 최적 편성
-//    (전법은 여기서 채우지 않고 자리만 비워둔 채로 resolveGlobalTactics에서 최종 확정)
 // ---------------------------------------------------------------
 export function buildOptimalSquads(remainingGenerals, startSquadNum, endSquadNum, usedGeneralNames) {
   const squads = [];
@@ -305,15 +474,15 @@ export function buildOptimalSquads(remainingGenerals, startSquadNum, endSquadNum
       formation_grid: formation.grid,
       squadNum,
       deck_setup: best.trio.map(g => {
-  const { artsOfWar, equipmentOptions } = recommendArtsAndEquipment(g);
-  return {
-    general_name: g.name,
-    added_tactics: [null, null],
-    arts_of_war: artsOfWar,
-    stat_focus: inferGeneralRole(g).join(' / '),
-    equipment_options: equipmentOptions
-  };
-}),
+        const { artsOfWar, equipmentOptions } = recommendArtsAndEquipment(g);
+        return {
+          general_name: g.name,
+          added_tactics: [null, null],
+          arts_of_war: artsOfWar,
+          stat_focus: inferGeneralRole(g).join(' / '),
+          equipment_options: equipmentOptions
+        };
+      }),
       _debug: { synScore: best.synScore, roleScore: best.roleScore, totalPower: best.totalPower }
     });
 
@@ -326,3 +495,17 @@ export function buildOptimalSquads(remainingGenerals, startSquadNum, endSquadNum
   return squads;
 }
 
+// ---------------------------------------------------------------
+// 8. [신규] deckEngineData 커버리지 체크 유틸
+//    보유 장수 중 카페 분석 자료(주로 골드 장수 위주)에 없는 이름을 뽑아준다.
+//    - 콘솔 디버깅용 또는 UI에 "이 장수는 연결 데이터가 부족합니다" 표시할 때 사용.
+// ---------------------------------------------------------------
+export function checkDeckEngineCoverage(ownedGeneralNames) {
+  const covered = [];
+  const missing = [];
+  for (const name of ownedGeneralNames) {
+    if (GENERAL_MACRO_MAP.has(name)) covered.push(name);
+    else missing.push(name);
+  }
+  return { covered, missing };
+}

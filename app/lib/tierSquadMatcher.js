@@ -1,7 +1,8 @@
 // 티어덱 기반 1단계: 장수 가용 여부만 체크, 전법은 원본 추천값을 그대로 담아두고
 // 최종 확정은 squadRecommendation.js의 resolveGlobalTactics에 맡긴다.
 
-function parseTierScore(tierName) {
+// squadOptimizer.js의 buildTacticFrequencyMap에서도 동일 기준으로 재사용하기 위해 export.
+export function parseTierScore(tierName) {
   const match = tierName.match(/T(\d)([+-]?)/);
   if (!match) return -1; // "T" 표기 없는 개척덱류는 최하 우선순위
   const num = parseInt(match[1], 10);

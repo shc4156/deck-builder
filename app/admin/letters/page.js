@@ -131,7 +131,10 @@ function SectionListEditor({ sections, setSections, numberOffset = 1 }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {sections.map((section, idx) => (
           <div key={section.id} style={{ border: '1px solid rgba(184,147,90,0.35)', padding: '12px', backgroundColor: 'var(--paper-soft)' }}>
-            <div className="section-heading-row" style={{ marginBottom: '8px' }}>
+            <div
+              className="section-heading-row"
+              style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '8px' }}
+            >
               <span style={{ fontWeight: 'bold', color: 'var(--seal-dark)', minWidth: '24px' }}>{idx + numberOffset}.</span>
               <select
                 value={section.colorTag}
@@ -147,7 +150,7 @@ function SectionListEditor({ sections, setSections, numberOffset = 1 }) {
                 value={section.heading}
                 onChange={(e) => updateSection(section.id, 'heading', e.target.value)}
                 placeholder="소제목 (예: 전선 현황)"
-                style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', flex: 1 }}
+                style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', flex: '1 1 160px', minWidth: '160px' }}
               />
               <button type="button" onClick={() => moveSection(section.id, -1)} disabled={idx === 0} style={{ padding: '5px 9px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1 }}>▲</button>
               <button type="button" onClick={() => moveSection(section.id, 1)} disabled={idx === sections.length - 1} style={{ padding: '5px 9px', cursor: idx === sections.length - 1 ? 'default' : 'pointer', opacity: idx === sections.length - 1 ? 0.3 : 1 }}>▼</button>
@@ -505,7 +508,7 @@ function SiegeScheduleForm() {
         if (e.hasRam) flags.push('투석차');
         const flagText = flags.length > 0 ? ` (${flags.join('·')} 배치)` : '';
         const locPart = e.castleInfo ? `${e.location}(${e.castleInfo})` : e.location;
-        const coordText = e.includeCoord && e.coord ? ` [좌표 ${e.coord.x}.${e.coord.y}]` : '';
+        const coordText = e.includeCoord && e.coord ? ` [좌표 (${e.coord.x},${e.coord.y})]` : '';
         return `▶ ${e.time} - ${locPart}${flagText}${coordText}`;
       })
       .join('\n');
@@ -603,14 +606,19 @@ function SiegeScheduleForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           {entries.map((entry) => (
             <div key={entry.id} style={{ border: '1px solid rgba(184,147,90,0.35)', padding: '12px', backgroundColor: 'var(--paper-soft)' }}>
-              <div className="entry-row">
+              {/* ⬇️ 여기가 수정된 부분: flexWrap을 강제로 걸어서 좁은 화면에서도
+                  성 이름 입력창이 화면 밖으로 밀려나지 않고 다음 줄로 내려오도록 함 */}
+              <div
+                className="entry-row"
+                style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '8px' }}
+              >
                 <input
                   value={entry.time}
                   onChange={(e) => updateEntry(entry.id, 'time', e.target.value)}
                   placeholder="시간 (예: 12:00)"
                   style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
                 />
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: '1 1 200px', minWidth: '200px' }}>
                   <CastleLocationInput
                     name={entry.location}
                     onNameChange={(v) => updateEntry(entry.id, 'location', v)}
@@ -763,7 +771,7 @@ function WarOperationsForm() {
     const opLines = operations
       .filter((o) => o.time || o.location || o.objective)
       .map((o) => {
-        const coordText = o.includeCoord && o.coord ? ` [좌표 ${o.coord.x}.${o.coord.y}]` : '';
+        const coordText = o.includeCoord && o.coord ? ` [좌표 (${o.coord.x},${o.coord.y})]` : '';
         const objText = o.objective ? ` - ${o.objective}` : '';
         return `▶ ${o.time} - ${o.location}${coordText}${objText}`;
       })
@@ -833,7 +841,10 @@ function WarOperationsForm() {
           />
         </div>
 
-        <div className="section-heading-row" style={{ marginBottom: '10px' }}>
+        <div
+          className="section-heading-row"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '10px' }}
+        >
           <span style={{ fontWeight: 'bold', color: 'var(--seal-dark)', minWidth: '24px' }}>1.</span>
           <select value={scheduleColorTag} onChange={(e) => setScheduleColorTag(e.target.value)} style={{ padding: '6px', border: '1px solid rgba(184,147,90,0.4)' }}>
             <option value="none">강조 없음</option>
@@ -844,7 +855,7 @@ function WarOperationsForm() {
           <input
             value={scheduleHeading}
             onChange={(e) => setScheduleHeading(e.target.value)}
-            style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', flex: 1 }}
+            style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', flex: '1 1 160px', minWidth: '160px' }}
           />
           <button type="button" onClick={addOperation} style={{ padding: '6px 12px', fontWeight: 'bold', border: '1px solid var(--jade)', color: 'var(--jade)', background: 'transparent', cursor: 'pointer' }}>
             + 일정 추가
@@ -854,14 +865,18 @@ function WarOperationsForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           {operations.map((op) => (
             <div key={op.id} style={{ border: '1px solid rgba(184,147,90,0.35)', padding: '12px', backgroundColor: 'var(--paper-soft)' }}>
-              <div className="entry-row">
+              {/* ⬇️ 여기도 동일하게 수정 */}
+              <div
+                className="entry-row"
+                style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '8px' }}
+              >
                 <input
                   value={op.time}
                   onChange={(e) => updateOperation(op.id, 'time', e.target.value)}
                   placeholder="시간 (예: 13:00)"
                   style={{ padding: '6px 8px', border: '1px solid rgba(184,147,90,0.4)', width: '110px' }}
                 />
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: '1 1 200px', minWidth: '200px' }}>
                   <CastleLocationInput
                     name={op.location}
                     onNameChange={(v) => updateOperation(op.id, 'location', v)}
