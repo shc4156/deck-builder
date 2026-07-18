@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import PageLayout from '../../components/PageLayout';
 import CastleLocationInput from '../../components/CastleLocationInput';
+import LetterImageCard from '../../components/LetterImageCard';
 import Link from 'next/link';
 // ⚠️ 프로젝트에 이미 Supabase 클라이언트 파일이 있다면 경로를 그 파일에 맞게 수정해주세요.
 import { supabase } from '../../lib/supabaseClient';
@@ -15,6 +16,8 @@ const LETTER_TEMPLATES = [
   { id: 'war_operations', label: '전쟁 일정 · 전선 · 전략', status: 'ready' },
   { id: 'custom_sections', label: '자유 형식 서신 (섹션형)', status: 'ready' },
 ];
+
+const CUSTOM_LETTER_CATEGORIES = ['공지', '법령', '안내문', '서신'];
 
 const TITLE_LIMIT = 11;
 const BODY_LIMIT = 600;
@@ -680,7 +683,7 @@ function SiegeScheduleForm() {
         </div>
       </div>
 
-      <LetterPreview title={title} bodyText={bodyText} copied={copied} onCopy={handleCopy} />
+      <LetterPreview title={title} bodyText={bodyText} copied={copied} onCopy={handleCopy} category="공성서신" />
     </div>
   );
 }
@@ -931,7 +934,7 @@ function WarOperationsForm() {
         </div>
       </div>
 
-      <LetterPreview title={title} bodyText={bodyText} copied={copied} onCopy={handleCopy} />
+      <LetterPreview title={title} bodyText={bodyText} copied={copied} onCopy={handleCopy} category="전쟁서신" />
     </div>
   );
 }
@@ -947,6 +950,7 @@ function SectionLetterForm() {
   ]);
   const [closingText, setClosingText] = useState('');
   const [author, setAuthor] = useState('');
+  const [category, setCategory] = useState('공지');
   const [copied, setCopied] = useState(false);
 
   const introRef = useRef(null);
@@ -961,12 +965,14 @@ function SectionLetterForm() {
       setSections(loadedSections);
       setClosingText(content.closingText || '');
       setAuthor(content.author || '');
+      setCategory(content.category || '공지');
     },
     resetFields: () => {
       setIntroText('');
       setSections([{ id: 1, colorTag: 'y', heading: '', body: '' }]);
       setClosingText('');
       setAuthor('');
+      setCategory('공지');
     },
   });
 
@@ -975,6 +981,7 @@ function SectionLetterForm() {
     sections: sections.map(({ id, ...rest }) => rest),
     closingText,
     author,
+    category,
   });
 
   const bodyText = useMemo(() => {
@@ -1012,6 +1019,21 @@ function SectionLetterForm() {
           onDelete={preset.handleDeletePreset}
           namePlaceholder="새 프리셋 이름 (예: 꼬마맹 운영수칙)"
         />
+
+        <div style={{ marginBottom: '18px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
+            서신 종류 (이미지 상단 뱃지에 표시됩니다)
+          </label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', width: '160px' }}
+          >
+            {CUSTOM_LETTER_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
 
         <div style={{ marginBottom: '18px' }}>
           <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
@@ -1065,12 +1087,79 @@ function SectionLetterForm() {
         </div>
       </div>
 
-      <LetterPreview title={title} bodyText={bodyText} copied={copied} onCopy={handleCopy} />
+      <LetterPreview title={title} bodyText={bodyText} copied={copied} onCopy={handleCopy} category={category} />
     </div>
   );
 }
 
-function LetterPreview({ title, bodyText, copied, onCopy }) {
+function LetterPreview({ title, bodyText, copied, onCopy, category }) {
+  const [generating, setGenerating] = useState(false);
+  const [imgCopied, setImgCopied] = useState(false);
+  const captureRef = useRef(null);
+
+  // 화면엔 안 보이지만 실제로 렌더링된 "인게임 서신" 카드를 캔버스로 캡처
+  const captureCanvas = async () => {
+    const html2canvas = (await import('html2canvas')).default;
+    return html2canvas(captureRef.current, {
+      backgroundColor: null,
+      scale: 2, // 고해상도로 캡처 (카톡 공유 시 화질 저하 방지)
+      useCORS: true,
+    });
+  };
+
+  const handleDownloadImage = async () => {
+    if (!bodyText.trim()) {
+      alert('먼저 본문을 입력해주세요.');
+      return;
+    }
+    setGenerating(true);
+    try {
+      const canvas = await captureCanvas();
+      const link = document.createElement('a');
+      link.download = `${(title || '서신').trim()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error('이미지 생성 실패:', err);
+      alert('이미지 생성에 실패했습니다: ' + err.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCopyImage = async () => {
+    if (!bodyText.trim()) {
+      alert('먼저 본문을 입력해주세요.');
+      return;
+    }
+    if (!navigator.clipboard || typeof window.ClipboardItem === 'undefined') {
+      alert('이 브라우저에서는 이미지 클립보드 복사가 지원되지 않습니다. "이미지 다운로드"를 이용해주세요. (크롬/엣지 최신 버전 권장)');
+      return;
+    }
+    setGenerating(true);
+    try {
+      const canvas = await captureCanvas();
+      await new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+          try {
+            if (!blob) throw new Error('이미지 변환 실패');
+            await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+            setImgCopied(true);
+            setTimeout(() => setImgCopied(false), 1800);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        }, 'image/png');
+      });
+    } catch (err) {
+      console.error('클립보드 복사 실패:', err);
+      alert('클립보드 복사에 실패했습니다: ' + err.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div className="scroll-panel letter-preview-panel" style={{ padding: '24px', position: 'sticky', top: '20px' }}>
       <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>미리보기</h3>
@@ -1118,6 +1207,52 @@ function LetterPreview({ title, bodyText, copied, onCopy }) {
       >
         {copied ? '복사됨!' : '제목+본문 복사하기'}
       </button>
+
+      {/* ⬇️ 이미지 생성 버튼 (카톡 공유용) */}
+      <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+        <button
+          type="button"
+          onClick={handleDownloadImage}
+          disabled={generating}
+          style={{
+            flex: 1,
+            padding: '10px 12px',
+            fontWeight: 'bold',
+            color: 'var(--seal-dark)',
+            backgroundColor: 'transparent',
+            border: '1px solid var(--gold)',
+            cursor: generating ? 'default' : 'pointer',
+            opacity: generating ? 0.6 : 1,
+          }}
+        >
+          {generating ? '생성 중...' : '🖼 이미지 다운로드'}
+        </button>
+        <button
+          type="button"
+          onClick={handleCopyImage}
+          disabled={generating}
+          style={{
+            flex: 1,
+            padding: '10px 12px',
+            fontWeight: 'bold',
+            color: 'var(--paper-soft)',
+            backgroundColor: imgCopied ? 'var(--jade)' : 'var(--seal-dark)',
+            border: 'none',
+            cursor: generating ? 'default' : 'pointer',
+            opacity: generating ? 0.6 : 1,
+          }}
+        >
+          {generating ? '생성 중...' : imgCopied ? '복사됨!' : '📋 이미지로 복사 (카톡용)'}
+        </button>
+      </div>
+      <p style={{ fontSize: '0.78rem', color: 'var(--gold-soft)', marginTop: '8px' }}>
+        "이미지로 복사"를 누르면 카카오톡 채팅창에 Ctrl+V(붙여넣기)로 바로 공유할 수 있습니다.
+      </p>
+
+      {/* 캡처 전용 숨김 영역: 화면 밖에 실제로 렌더링해두어야 html2canvas가 캡처할 수 있습니다 */}
+      <div style={{ position: 'fixed', top: 0, left: '-9999px', pointerEvents: 'none' }}>
+        <LetterImageCard ref={captureRef} title={title} bodyText={bodyText} category={category} />
+      </div>
     </div>
   );
 }
