@@ -34,29 +34,100 @@ function todayDayLabel() {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD (업로드한 날짜 기준, 일간)
 }
 
-// 주간 리셋을 감지해서 순수 "오늘 증가량(델타)"을 계산
+// ── 리셋 감지 델타 계산 (필드 공용) ──────────────────────
+// 인게임 "주간" 수치는 일요일마다 0으로 리셋된다.
+// 어제보다 오늘 값이 작으면 리셋이 일어난 것으로 보고,
+// 그 경우 오늘 값 자체를 "오늘 하루 순수 증가분"으로 취급한다.
+function computeFieldDelta(current, prev) {
+  if (prev === null || prev === undefined) {
+    return { delta: current, reset: false, noPrevData: true };
+  }
+  if (current < prev) {
+    return { delta: current, reset: true, noPrevData: false };
+  }
+  return { delta: current - prev, reset: false, noPrevData: false };
+}
+
 function computeDailyDelta(currentRow, prevRow) {
   if (!currentRow) return null;
-  if (!prevRow) return { meritDelta: null, contribDelta: null, resetHappened: false, noPrevData: true };
-
-  const meritDropped = currentRow.weekly_merit < prevRow.weekly_merit;
-  const contribDropped = currentRow.weekly_contribution < prevRow.weekly_contribution;
-
-  if (meritDropped || contribDropped) {
-    // 주간 리셋 발생 → 오늘 누적치 자체가 이번 주 첫 델타
-    return {
-      meritDelta: currentRow.weekly_merit,
-      contribDelta: currentRow.weekly_contribution,
-      resetHappened: true,
-      noPrevData: false,
-    };
-  }
+  const merit = computeFieldDelta(currentRow.weekly_merit, prevRow?.weekly_merit);
+  const contrib = computeFieldDelta(currentRow.weekly_contribution, prevRow?.weekly_contribution);
+  const siege = computeFieldDelta(currentRow.siege_count, prevRow?.siege_count);
   return {
-    meritDelta: currentRow.weekly_merit - prevRow.weekly_merit,
-    contribDelta: currentRow.weekly_contribution - prevRow.weekly_contribution,
-    resetHappened: false,
-    noPrevData: false,
+    meritDelta: merit.delta,
+    contribDelta: contrib.delta,
+    siegeDelta: siege.delta,
+    resetHappened: merit.reset || contrib.reset || siege.reset,
+    noPrevData: merit.noPrevData,
   };
+}
+
+// ── 사람별 히스토리를 날짜순으로 정렬하고, 리셋과 무관하게
+//    계속 쌓이는 누적치를 계산 ─────────────────────────────
+function buildMemberHistory(weeklyStats) {
+  const byChar = {};
+  weeklyStats.forEach((r) => {
+    if (!byChar[r.char_id]) byChar[r.char_id] = [];
+    byChar[r.char_id].push(r);
+  });
+
+  const historyByChar = {};
+
+  Object.entries(byChar).forEach(([charId, rows]) => {
+    const sorted = [...rows].sort((a, b) => a.week_label.localeCompare(b.week_label));
+    let cumMerit = 0;
+    let cumContrib = 0;
+    let cumSiege = 0;
+
+    const entries = sorted.map((row, idx) => {
+      const prev = idx > 0 ? sorted[idx - 1] : null;
+      const delta = computeDailyDelta(row, prev);
+
+      cumMerit += delta.meritDelta;
+      cumContrib += delta.contribDelta;
+      cumSiege += delta.siegeDelta;
+
+      return {
+        ...row,
+        dailyMeritDelta: delta.meritDelta,
+        dailyContribDelta: delta.contribDelta,
+        dailySiegeDelta: delta.siegeDelta,
+        resetHappened: delta.resetHappened,
+        noPrevData: delta.noPrevData,
+        cumulativeMerit: cumMerit,
+        cumulativeContribution: cumContrib,
+        cumulativeSiege: cumSiege,
+      };
+    });
+
+    historyByChar[charId] = entries;
+  });
+
+  return historyByChar;
+}
+
+// 특정 날짜 기준으로 최근 N일간의 순수 증가분 합계 (리셋 시점과 무관한 "최근 활동량")
+function sumRecentWindow(entries, latestDateStr, windowDays) {
+  const latestDate = new Date(latestDateStr);
+  const cutoff = new Date(latestDate);
+  cutoff.setDate(cutoff.getDate() - (windowDays - 1));
+
+  let meritSum = 0;
+  let contribSum = 0;
+  let siegeSum = 0;
+  let daysCounted = 0;
+
+  entries.forEach((e) => {
+    const d = new Date(e.week_label);
+    if (d >= cutoff && d <= latestDate) {
+      meritSum += e.dailyMeritDelta;
+      contribSum += e.dailyContribDelta;
+      siegeSum += e.dailySiegeDelta;
+      daysCounted += 1;
+    }
+  });
+
+  return { meritSum, contribSum, siegeSum, daysCounted };
 }
 
 export default function MemberManagementPage() {
@@ -66,7 +137,8 @@ export default function MemberManagementPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
   const [contribThreshold, setContribThreshold] = useState(15000);
-  const [weeklyStats, setWeeklyStats] = useState([]); // 최근 일자별 DB 데이터
+  const [windowDays, setWindowDays] = useState(7); // 액티브 판정에 쓸 롤링 윈도우(일)
+  const [weeklyStats, setWeeklyStats] = useState([]); // 전체 일자별 DB 데이터
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -128,13 +200,13 @@ export default function MemberManagementPage() {
     }
   };
 
-  // 전체 데이터를 불러와서 연속 미활동/델타 계산
+  // 전체 데이터를 불러와서 누적/윈도우 계산에 사용
   const loadStats = async () => {
     setIsLoadingStats(true);
     const { data, error } = await supabase
       .from('member_weekly_stats')
       .select('*')
-      .order('week_label', { ascending: false })
+      .order('week_label', { ascending: true }) // 히스토리 계산을 위해 오름차순으로 받음
       .order('member_name', { ascending: true });
 
     setIsLoadingStats(false);
@@ -147,71 +219,76 @@ export default function MemberManagementPage() {
     loadStats();
   }, []);
 
+  // ── 히스토리 & 누적치 계산 ───────────────────────────
+  const historyByChar = buildMemberHistory(weeklyStats);
+
   // 일자 목록 (최신순)
   const dayLabels = [...new Set(weeklyStats.map((r) => r.week_label))].sort().reverse();
-  const recentDays = dayLabels.slice(0, 3);
-
-  // 사람별로 일자 데이터 묶기
-  const byPerson = {};
-  weeklyStats.forEach((r) => {
-    if (!byPerson[r.char_id]) byPerson[r.char_id] = {};
-    byPerson[r.char_id][r.week_label] = r;
-  });
-
+  const recentDays = dayLabels.slice(0, 2);
   const latestDay = recentDays[0];
-  const prevDay = recentDays[1]; // 어제
-  const currentDayDataRaw = latestDay ? weeklyStats.filter((r) => r.week_label === latestDay) : [];
+  const prevDay = recentDays[1];
 
   // 오늘 이전에 한 번이라도 존재했는지로 신규멤버 판별
   const pastCharIds = new Set(
     weeklyStats.filter((r) => r.week_label !== latestDay).map((r) => r.char_id)
   );
 
-  // 델타 + 신규멤버 플래그를 붙인 오늘자 데이터
-  const currentDayData = currentDayDataRaw.map((r) => {
-    const prevRow = prevDay ? byPerson[r.char_id]?.[prevDay] : null;
-    const delta = computeDailyDelta(r, prevRow);
-    return {
-      ...r,
-      isNew: !pastCharIds.has(r.char_id),
-      delta,
-    };
-  });
+  // 오늘자 데이터 + 누적치 + 최근 윈도우 활동량을 합친 최종 데이터
+  const currentDayData = Object.entries(historyByChar)
+    .map(([charId, entries]) => {
+      const latestEntry = entries[entries.length - 1];
+      if (!latestEntry || latestEntry.week_label !== latestDay) return null;
 
-  const activeCount = currentDayData.filter((r) => r.weekly_contribution > contribThreshold).length;
-  const inactiveToday = currentDayData.filter((r) => r.weekly_contribution <= contribThreshold);
+      const window = sumRecentWindow(entries, latestDay, windowDays);
 
-  // 2일 연속 비액티브(컷 대상): 최근 2일 데이터가 모두 존재하고, 둘 다 기준치 이하
+      return {
+        ...latestEntry,
+        isNew: !pastCharIds.has(charId),
+        recentContribSum: window.contribSum,
+        recentMeritSum: window.meritSum,
+        recentSiegeSum: window.siegeSum,
+        recentDaysCounted: window.daysCounted,
+      };
+    })
+    .filter(Boolean);
+
+  // ── 액티브/비액티브: 인게임 리셋 카운터가 아니라
+  //    "최근 N일 순수 증가량" 기준으로 판정 ──────────────
+  const activeCount = currentDayData.filter((r) => r.recentContribSum > contribThreshold).length;
+  const inactiveToday = currentDayData.filter((r) => r.recentContribSum <= contribThreshold);
+
+  // 2일 연속 "최근 윈도우 활동량"이 기준 이하인 사람 (컷 대상)
   const cutTargets = [];
   if (recentDays.length >= 2) {
     const [d1, d2] = recentDays; // d1=오늘, d2=어제
-    Object.entries(byPerson).forEach(([charId, days]) => {
-      const r1 = days[d1];
-      const r2 = days[d2];
-      if (r1 && r2 && r1.weekly_contribution <= contribThreshold && r2.weekly_contribution <= contribThreshold) {
-        cutTargets.push(r1);
+    Object.entries(historyByChar).forEach(([charId, entries]) => {
+      const e1 = entries.find((e) => e.week_label === d1);
+      const e2 = entries.find((e) => e.week_label === d2);
+      if (!e1 || !e2) return;
+      const w1 = sumRecentWindow(entries, d1, windowDays).contribSum;
+      const w2 = sumRecentWindow(entries, d2, windowDays).contribSum;
+      if (w1 <= contribThreshold && w2 <= contribThreshold) {
+        cutTargets.push({ ...e1, isNew: !pastCharIds.has(charId), recentContribSum: w1 });
       }
     });
   }
 
-  // 필터 3종
-  const zeroMeritList = currentDayData.filter((r) => r.weekly_merit === 0);
-  const lowContribList = currentDayData.filter((r) => r.weekly_contribution <= 15000);
-  const lowSiegeList = [...currentDayData].sort((a, b) => a.siege_count - b.siege_count);
+  // 필터: 오늘 무훈 증가가 0인 사람 (리셋 직후 카운터가 0인 것과 구분하기 위해 '오늘 증가분' 기준)
+  const zeroMeritList = currentDayData.filter((r) => r.dailyMeritDelta === 0);
+  const lowContribList = currentDayData.filter((r) => r.recentContribSum <= contribThreshold);
+  const lowSiegeList = [...currentDayData].sort((a, b) => a.cumulativeSiege - b.cumulativeSiege);
 
   // ── 차트용 데이터 ──────────────────────────────
-  // 1) 동맹 전체 요약: 액티브 vs 비액티브
   const activeVsInactiveData = [
     { name: '액티브', count: activeCount },
     { name: '비액티브', count: inactiveToday.length },
   ];
 
-  // 2) 조별 평균 공헌
   const groupAvgMap = {};
   currentDayData.forEach((r) => {
     const g = r.group_name || '미배정';
     if (!groupAvgMap[g]) groupAvgMap[g] = { sum: 0, count: 0 };
-    groupAvgMap[g].sum += r.weekly_contribution;
+    groupAvgMap[g].sum += r.recentContribSum;
     groupAvgMap[g].count += 1;
   });
   const groupAvgData = Object.entries(groupAvgMap).map(([name, v]) => ({
@@ -219,23 +296,21 @@ export default function MemberManagementPage() {
     평균공헌: Math.round(v.sum / v.count),
   }));
 
-  // 3) 공헌 하위 10명
   const bottomContribData = [...currentDayData]
-    .sort((a, b) => a.weekly_contribution - b.weekly_contribution)
+    .sort((a, b) => a.recentContribSum - b.recentContribSum)
     .slice(0, 10)
-    .map((r) => ({ name: r.member_name, 공헌: r.weekly_contribution }));
+    .map((r) => ({ name: r.member_name, [`최근${windowDays}일공헌`]: r.recentContribSum }));
 
-  // 4) 공성횟수 하위 10명
-  const bottomSiegeData = lowSiegeList
+  const bottomSiegeData = [...currentDayData]
+    .sort((a, b) => a.cumulativeSiege - b.cumulativeSiege)
     .slice(0, 10)
-    .map((r) => ({ name: r.member_name, 공성: r.siege_count }));
+    .map((r) => ({ name: r.member_name, 누적공성: r.cumulativeSiege }));
 
-  // 5) 오늘 순수 증가량(델타) 하위 10명 — 실제로 오늘 안 한 사람
   const bottomDeltaData = currentDayData
-    .filter((r) => r.delta && !r.delta.noPrevData)
-    .sort((a, b) => a.delta.contribDelta - b.delta.contribDelta)
+    .filter((r) => !r.noPrevData)
+    .sort((a, b) => a.dailyContribDelta - b.dailyContribDelta)
     .slice(0, 10)
-    .map((r) => ({ name: r.member_name, 오늘증가분: r.delta.contribDelta }));
+    .map((r) => ({ name: r.member_name, 오늘증가분: r.dailyContribDelta }));
 
   return (
     <PageLayout>
@@ -251,6 +326,7 @@ export default function MemberManagementPage() {
         <h1 className="classic-heading text-3xl font-bold mb-2">인원 관리</h1>
         <p style={{ color: 'var(--gold-soft)', marginBottom: '24px', fontSize: '1.05rem', fontWeight: 500 }}>
           일간 맹원 데이터 엑셀을 업로드하면 액티브 현황과 관리·컷 대상을 자동으로 파악합니다.
+          인게임 주간 수치는 매주 리셋되므로, 실제 판정은 리셋과 무관하게 계속 쌓이는 누적/최근 활동량을 기준으로 합니다.
         </p>
 
         {/* 업로드 영역 */}
@@ -295,12 +371,22 @@ export default function MemberManagementPage() {
         <div className="scroll-panel" style={{ padding: '24px', marginBottom: '30px' }}>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>주간 공헌 기준치</label>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>공헌 기준치 (최근 활동량 기준)</label>
               <input
                 type="number"
                 value={contribThreshold}
                 onChange={(e) => setContribThreshold(Number(e.target.value))}
                 style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>활동량 집계 기간 (일)</label>
+              <input
+                type="number"
+                min={1}
+                value={windowDays}
+                onChange={(e) => setWindowDays(Math.max(1, Number(e.target.value)))}
+                style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', width: '100px' }}
               />
             </div>
             <button
@@ -314,8 +400,9 @@ export default function MemberManagementPage() {
 
           {latestDay && (
             <p style={{ fontSize: '0.9rem', color: 'var(--ink-text)' }}>
-              현재 조회 기준 날짜: <strong>{latestDay}</strong> (전체 {currentDayData.length}명)
-              {!prevDay && <span style={{ marginLeft: '10px', color: 'var(--seal-dark)' }}>* 어제 데이터가 없어 오늘 증가량(델타)은 계산되지 않습니다.</span>}
+              현재 조회 기준 날짜: <strong>{latestDay}</strong> (전체 {currentDayData.length}명) ·
+              최근 <strong>{windowDays}일</strong> 순수 증가량 기준으로 액티브를 판정합니다 (인게임 주간 리셋과 무관).
+              {!prevDay && <span style={{ marginLeft: '10px', color: 'var(--seal-dark)' }}>* 이전 날짜 데이터가 없어 델타/누적은 오늘 값 그대로 시작됩니다.</span>}
             </p>
           )}
         </div>
@@ -365,7 +452,7 @@ export default function MemberManagementPage() {
                   </ResponsiveContainer>
                 </div>
                 <div>
-                  <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>조별 평균 공헌</p>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>조별 평균 공헌 (최근 {windowDays}일)</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={groupAvgData}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -384,26 +471,26 @@ export default function MemberManagementPage() {
               <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>개인별 순위 (하위 10명)</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
                 <div>
-                  <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>공헌 하위 10명</p>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>최근 {windowDays}일 공헌 하위 10명</p>
                   <ResponsiveContainer width="100%" height={260}>
                     <BarChart data={bottomContribData} layout="vertical" margin={{ left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" />
                       <YAxis type="category" dataKey="name" width={70} />
                       <Tooltip />
-                      <Bar dataKey="공헌" fill="var(--seal)" />
+                      <Bar dataKey={`최근${windowDays}일공헌`} fill="var(--seal)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div>
-                  <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>공성횟수 하위 10명</p>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>누적 공성횟수 하위 10명</p>
                   <ResponsiveContainer width="100%" height={260}>
                     <BarChart data={bottomSiegeData} layout="vertical" margin={{ left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" />
                       <YAxis type="category" dataKey="name" width={70} />
                       <Tooltip />
-                      <Bar dataKey="공성" fill="var(--seal-dark)" />
+                      <Bar dataKey="누적공성" fill="var(--seal-dark)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -428,7 +515,7 @@ export default function MemberManagementPage() {
             {cutTargets.length > 0 && (
               <div className="scroll-panel" style={{ padding: '24px', marginBottom: '24px', border: '2px solid var(--seal)' }}>
                 <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--seal-dark)' }}>
-                  ⚠ 2일 연속 비액티브 (컷 대상)
+                  ⚠ 2일 연속 비액티브 (컷 대상, 최근 {windowDays}일 기준)
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
                   {cutTargets.map((r) => (
@@ -440,7 +527,7 @@ export default function MemberManagementPage() {
                         {r.job} · {r.position} · {r.group_name}
                       </div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', fontWeight: 'bold', marginTop: '4px' }}>
-                        오늘 공헌: {r.weekly_contribution.toLocaleString()}
+                        최근 {windowDays}일 공헌: {r.recentContribSum.toLocaleString()}
                       </div>
                     </div>
                   ))}
@@ -448,11 +535,11 @@ export default function MemberManagementPage() {
               </div>
             )}
 
-            {/* 필터 3종: 무훈 0 / 공헌 15000 이하 / 공성 하위 */}
+            {/* 필터 3종 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px', marginBottom: '24px' }}>
               <div className="scroll-panel" style={{ padding: '20px' }}>
                 <h3 className="classic-heading" style={{ fontSize: '1.05rem', marginBottom: '12px' }}>
-                  무훈 0 ({zeroMeritList.length}명)
+                  오늘 무훈 증가 0 ({zeroMeritList.length}명)
                 </h3>
                 {zeroMeritList.map((r) => (
                   <div key={r.char_id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(184,147,90,0.15)', fontSize: '0.9rem' }}>
@@ -464,24 +551,24 @@ export default function MemberManagementPage() {
 
               <div className="scroll-panel" style={{ padding: '20px' }}>
                 <h3 className="classic-heading" style={{ fontSize: '1.05rem', marginBottom: '12px' }}>
-                  공헌 15,000 이하 ({lowContribList.length}명)
+                  최근 {windowDays}일 공헌 {contribThreshold.toLocaleString()} 이하 ({lowContribList.length}명)
                 </h3>
                 {lowContribList.map((r) => (
                   <div key={r.char_id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(184,147,90,0.15)', fontSize: '0.9rem' }}>
                     <strong>{r.member_name}</strong> {r.isNew && <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>[신규]</span>}
-                    <span style={{ color: 'var(--seal-dark)', marginLeft: '6px' }}>{r.weekly_contribution.toLocaleString()}</span>
+                    <span style={{ color: 'var(--seal-dark)', marginLeft: '6px' }}>{r.recentContribSum.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
 
               <div className="scroll-panel" style={{ padding: '20px' }}>
                 <h3 className="classic-heading" style={{ fontSize: '1.05rem', marginBottom: '12px' }}>
-                  공성횟수 낮은 순
+                  누적 공성횟수 낮은 순
                 </h3>
                 {lowSiegeList.slice(0, 15).map((r) => (
                   <div key={r.char_id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(184,147,90,0.15)', fontSize: '0.9rem' }}>
                     <strong>{r.member_name}</strong> {r.isNew && <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>[신규]</span>}
-                    <span style={{ color: 'var(--ink-text)', marginLeft: '6px' }}>{r.siege_count}회</span>
+                    <span style={{ color: 'var(--ink-text)', marginLeft: '6px' }}>{r.cumulativeSiege}회</span>
                   </div>
                 ))}
               </div>
@@ -500,15 +587,15 @@ export default function MemberManagementPage() {
                       <th style={{ textAlign: 'left', padding: '8px' }}>직업</th>
                       <th style={{ textAlign: 'left', padding: '8px' }}>직위</th>
                       <th style={{ textAlign: 'left', padding: '8px' }}>조별</th>
-                      <th style={{ textAlign: 'right', padding: '8px' }}>주간 무훈</th>
-                      <th style={{ textAlign: 'right', padding: '8px' }}>주간 공헌</th>
-                      <th style={{ textAlign: 'right', padding: '8px' }}>공성 횟수</th>
+                      <th style={{ textAlign: 'right', padding: '8px' }}>누적 무훈</th>
+                      <th style={{ textAlign: 'right', padding: '8px' }}>누적 공헌</th>
+                      <th style={{ textAlign: 'right', padding: '8px' }}>최근 {windowDays}일 공헌</th>
                       <th style={{ textAlign: 'right', padding: '8px' }}>오늘 증가분</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inactiveToday
-                      .sort((a, b) => a.weekly_contribution - b.weekly_contribution)
+                      .sort((a, b) => a.recentContribSum - b.recentContribSum)
                       .map((r) => (
                         <tr key={r.char_id} style={{ borderBottom: '1px solid rgba(184,147,90,0.2)' }}>
                           <td style={{ padding: '8px', fontWeight: 'bold' }}>
@@ -517,11 +604,11 @@ export default function MemberManagementPage() {
                           <td style={{ padding: '8px' }}>{r.job}</td>
                           <td style={{ padding: '8px' }}>{r.position}</td>
                           <td style={{ padding: '8px' }}>{r.group_name}</td>
-                          <td style={{ padding: '8px', textAlign: 'right' }}>{r.weekly_merit.toLocaleString()}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', color: 'var(--seal-dark)', fontWeight: 'bold' }}>{r.weekly_contribution.toLocaleString()}</td>
-                          <td style={{ padding: '8px', textAlign: 'right' }}>{r.siege_count}</td>
+                          <td style={{ padding: '8px', textAlign: 'right' }}>{r.cumulativeMerit.toLocaleString()}</td>
+                          <td style={{ padding: '8px', textAlign: 'right' }}>{r.cumulativeContribution.toLocaleString()}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: 'var(--seal-dark)', fontWeight: 'bold' }}>{r.recentContribSum.toLocaleString()}</td>
                           <td style={{ padding: '8px', textAlign: 'right' }}>
-                            {r.delta?.noPrevData ? '-' : r.delta?.contribDelta?.toLocaleString()}
+                            {r.noPrevData ? '-' : r.dailyContribDelta.toLocaleString()}
                           </td>
                         </tr>
                       ))}
