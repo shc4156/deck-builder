@@ -1,4 +1,3 @@
-// app/generals/page.js
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient'; 
@@ -12,6 +11,7 @@ export default function GeneralsPage() {
 
   useEffect(() => {
     async function fetchData() {
+      // 장수 데이터 불러오기 (가나다순 정렬 적용)
       const { data: genData } = await supabase
         .from('generals')
         .select('*')
@@ -54,6 +54,7 @@ export default function GeneralsPage() {
               backgroundColor: filter === f ? '#e74c3c' : '#bdc3c7',
               color: filter === f ? '#fff' : '#2c3e50'
             }}
+            
           >
             {f}
           </button>
