@@ -1,0 +1,170 @@
+[
+  {
+    "category": "attack_carry",
+    "rank": 1,
+    "general_name": "제갈량",
+    "role_type": "Main",
+    "role_index": 100,
+    "role_grade": 5
+  },
+  {
+    "category": "attack_carry",
+    "rank": 2,
+    "general_name": "곽가",
+    "role_type": "Sub(Main=Engine)",
+    "role_index": 95,
+    "role_grade": 4
+  },
+  {
+    "category": "attack_carry",
+    "rank": 3,
+    "general_name": "마초",
+    "role_type": "Main",
+    "role_index": 94,
+    "role_grade": 4
+  },
+  {
+    "category": "attack_carry",
+    "rank": 4,
+    "general_name": "주유",
+    "role_type": "Sub(Main=Engine)",
+    "role_index": 94,
+    "role_grade": 4
+  },
+  {
+    "category": "attack_carry",
+    "rank": 5,
+    "general_name": "장각",
+    "role_type": "Main",
+    "role_index": 93,
+    "role_grade": 4
+  },
+  {
+    "category": "attack_carry",
+    "rank": 6,
+    "general_name": "조운",
+    "role_type": "Main",
+    "role_index": 93,
+    "role_grade": 4
+  },
+  {
+    "category": "attack_carry",
+    "rank": 7,
+    "general_name": "관우",
+    "role_type": "Main",
+    "role_index": 92,
+    "role_grade": 4
+  },
+  {
+    "category": "attack_carry",
+    "rank": 8,
+    "general_name": "황충",
+    "role_type": "Main",
+    "role_index": 92,
+    "role_grade": 4
+  },
+  {
+    "category": "attack_carry",
+    "rank": 9,
+    "general_name": "손상향",
+    "role_type": "Main",
+    "role_index": 91,
+    "role_grade": 4
+  },
+  {
+    "category": "support_engine",
+    "rank": 1,
+    "general_name": "곽가",
+    "role_type": "Main",
+    "role_index": 100,
+    "role_grade": 5
+  },
+  {
+    "category": "support_engine",
+    "rank": 2,
+    "general_name": "손권",
+    "role_type": "Main",
+    "role_index": 95,
+    "role_grade": 4
+  },
+  {
+    "category": "support_engine",
+    "rank": 3,
+    "general_name": "주유",
+    "role_type": "Main",
+    "role_index": 92,
+    "role_grade": 4
+  },
+  {
+    "category": "support_amplifier",
+    "rank": 1,
+    "general_name": "대교",
+    "role_type": "Main",
+    "role_index": 100,
+    "role_grade": 5
+  },
+  {
+    "category": "support_amplifier",
+    "rank": 2,
+    "general_name": "순욱",
+    "role_type": "Main",
+    "role_index": 95,
+    "role_grade": 4
+  },
+  {
+    "category": "support_amplifier",
+    "rank": 3,
+    "general_name": "견희",
+    "role_type": "Main",
+    "role_index": 92,
+    "role_grade": 4
+  },
+  {
+    "category": "support_sustain",
+    "rank": 1,
+    "general_name": "유비",
+    "role_type": "Main",
+    "role_index": 100,
+    "role_grade": 5
+  },
+  {
+    "category": "support_sustain",
+    "rank": 2,
+    "general_name": "화타",
+    "role_type": "Main",
+    "role_index": 95,
+    "role_grade": 4
+  },
+  {
+    "category": "support_sustain",
+    "rank": 3,
+    "general_name": "등애",
+    "role_type": "Main",
+    "role_index": 94,
+    "role_grade": 4
+  },
+  {
+    "category": "control_trigger",
+    "rank": 1,
+    "general_name": "황개",
+    "role_type": "Main",
+    "role_index": 100,
+    "role_grade": 5
+  },
+  {
+    "category": "control_trigger",
+    "rank": 2,
+    "general_name": "장비",
+    "role_type": "Main",
+    "role_index": 95,
+    "role_grade": 4
+  },
+  {
+    "category": "control_trigger",
+    "rank": 3,
+    "general_name": "장량",
+    "role_type": "Main",
+    "role_index": 93,
+    "role_grade": 4
+  }
+]
