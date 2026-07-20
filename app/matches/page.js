@@ -18,7 +18,6 @@ export default function MatchesPage() {
   const [glossaryTerm, setGlossaryTerm] = useState(null);
   const [myPinnedDecks, setMyPinnedDecks] = useState([]);
 
-  // 핀 불러오기
   useEffect(() => {
     async function fetchPinnedDecks() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -37,7 +36,6 @@ export default function MatchesPage() {
     fetchPinnedDecks();
   }, []);
 
-  // deck_setup 안전 파싱
   const parsedTierDecks = useMemo(() => {
     return tierDecks.map(deck => ({
       ...deck,
@@ -139,7 +137,6 @@ export default function MatchesPage() {
           {filteredDecks.map(deck => {
             const { totalPercent } = deck.matchInfo || { totalPercent: 0 };
             const isStartDeck = deck.deck_type === 'start';
-            const formationInfo = matchFormationInfo(deck.formation_grid);
             const isPinned = myPinnedDecks.includes(deck.id);
             const safeSetup = deck.deck_setup || [];
 
@@ -150,47 +147,28 @@ export default function MatchesPage() {
                 style={{ 
                   padding: '28px', 
                   position: 'relative',
-                  border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)',
-                  boxShadow: isPinned ? '0 0 10px rgba(184,147,90,0.2)' : 'none'
+                  border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)'
                 }}
               >
-                {/* 핀 버튼 */}
-                <button 
-                  onClick={() => togglePin(deck.id)}
-                  style={{ position: 'absolute', top: '24px', left: '24px', fontSize: '1.6rem', background: 'none', border: 'none', zIndex: 10 }}
-                >
+                <button onClick={() => togglePin(deck.id)} style={{ position: 'absolute', top: '24px', left: '24px', fontSize: '1.6rem' }}>
                   {isPinned ? '📌' : '📍'}
                 </button>
 
-                <div style={{ position: 'absolute', top: '24px', right: '28px', textAlign: 'right' }}>
-                  <span style={{
-                    padding: '5px 12px', fontSize: '0.85rem', fontWeight: 'bold', color: 'white',
-                    backgroundColor: isStartDeck ? 'var(--jade)' : 'var(--seal)', marginRight: '12px'
-                  }}>
-                    {isStartDeck ? '개척추천' : '종결'}
+                <div style={{ position: 'absolute', top: '24px', right: '28px' }}>
+                  <span style={{ padding: '5px 12px', backgroundColor: isStartDeck ? 'var(--jade)' : 'var(--seal)', color: 'white' }}>
+                    {isStartDeck ? '개척' : '종결'}
                   </span>
-                  <span style={{ fontSize: '2.1rem', fontWeight: '900' }}>
+                  <span style={{ fontSize: '2.1rem', fontWeight: '900', marginLeft: '12px' }}>
                     {totalPercent}%
                   </span>
                 </div>
 
-                <h3 className="deck-title classic-heading" style={{ paddingLeft: '45px', marginBottom: '14px' }}>
-                  {deck.tier_name}
-                </h3>
+                <h3 className="deck-title" style={{ paddingLeft: '45px' }}>{deck.tier_name}</h3>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <FormationGridVisual gridData={deck.formation_grid} />
-                </div>
-
-                {/* 장수 목록 */}
-                <div className="deck-general-grid">
-                  {safeSetup.map((gSetup, idx) => (
-                    <div key={idx} style={{ padding: '16px', border: '1px solid #ddd', marginBottom: '12px' }}>
-                      <strong>{gSetup.general_name}</strong>
-                      <div style={{ fontSize: '0.9rem', color: '#666' }}>속성: {gSetup.stat_focus}</div>
-                      <div style={{ fontSize: '0.9rem', marginTop: '8px' }}>
-                        추천 전법: {gSetup.added_tactics ? gSetup.added_tactics.join(', ') : '-'}
-                      </div>
+                <div style={{ margin: '20px 0' }}>
+                  {safeSetup.map((g, idx) => (
+                    <div key={idx} style={{ padding: '12px', border: '1px solid #ddd', marginBottom: '8px' }}>
+                      <strong>{g.general_name}</strong> — {g.stat_focus || '속성 미정'}
                     </div>
                   ))}
                 </div>
@@ -203,4 +181,4 @@ export default function MatchesPage() {
       <GlossaryModal term={glossaryTerm} onClose={() => setGlossaryTerm(null)} />
     </PageLayout>
   );
-                                                                                    }
+}
