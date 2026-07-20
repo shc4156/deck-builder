@@ -1,80 +1,59 @@
 // hooks/useDeckAssets.js
 'use client';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../app/lib/supabaseClient';
+import { useState, useEffect } from 'react';
 
 export function useDeckAssets() {
-  // 1. Generals
-  const generalsQuery = useQuery({
-    queryKey: ['generals'],
-    queryFn: async () => {
-      const { data } = await supabase.from('generals').select('*').order('name');
-      return data || [];
-    },
-  });
+  const [generals, setGenerals] = useState([]);
+  const [tactics, setTactics] = useState([]);
+  const [tierDecks, setTierDecks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 2. Tactics
-  const tacticsQuery = useQuery({
-    queryKey: ['tactics'],
-    queryFn: async () => {
-      const { data } = await supabase.from('tactics').select('*').order('name');
-      return data || [];
-    },
-  });
+  useEffect(() => {
+    async function loadData() {
+      try {
+        // Supabase에서 불러오기 (기존 방식 유지)
+        const [gensRes, tacticsRes, decksRes] = await Promise.all([
+          fetch('/api/generals'),     // 필요시 API route 만들어야 함
+          fetch('/api/tactics'),
+          fetch('/api/tier-decks')
+        ]);
 
-  // 3. Tier Decks
-  const tierDecksQuery = useQuery({
-    queryKey: ['tierDecks'],
-    queryFn: async () => {
-      const { data } = await supabase.from('tier_decks').select('*').order('tier_name');
-      return data || [];
-    },
-  });
+        const gens = await gensRes.json();
+        const tacts = await tacticsRes.json();
+        const decks = await decksRes.json();
 
-  // 4. General Roles (새로 추가)
-  const generalRolesQuery = useQuery({
-    queryKey: ['generalRoles'],
-    queryFn: async () => {
-      // Supabase 테이블이 있으면 아래 사용
-      // const { data } = await supabase.from('general_roles').select('*');
-      // return data || [];
+        setGenerals(gens);
+        setTactics(tacts);
+        setTierDecks(decks);
+      } catch (error) {
+        console.error("데이터 로딩 실패:", error);
+        // fallback: JSON 파일에서 불러오기
+        try {
+          const [g, t, d] = await Promise.all([
+            fetch('/data/generals_rows.json').then(r => r.json()),
+            fetch('/data/tactics.json').then(r => r.json()), // 파일명 확인
+            fetch('/data/tier_decks_rows.json').then(r => r.json())
+          ]);
+          setGenerals(g);
+          setTactics(t);
+          setTierDecks(d);
+        } catch (e) {
+          console.error("fallback도 실패", e);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
 
-      // 아직 테이블이 없다면 JSON 파일에서 불러오기
-      const res = await fetch('/data/general_roles_rows.json');
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
-
-  // 5. General Connections (연계 데이터)
-  const connectionsQuery = useQuery({
-    queryKey: ['generalConnections'],
-    queryFn: async () => {
-      const res = await fetch('/data/general_connections_rows.json');
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
-
-  const isLoading = 
-    generalsQuery.isLoading || 
-    tacticsQuery.isLoading || 
-    tierDecksQuery.isLoading ||
-    generalRolesQuery.isLoading ||
-    connectionsQuery.isLoading;
+    loadData();
+  }, []);
 
   return {
-    generals: generalsQuery.data || [],
-    tactics: tacticsQuery.data || [],
-    tierDecks: tierDecksQuery.data || [],
-    generalRoles: generalRolesQuery.data || [],     // ← 새로 추가
-    generalConnections: connectionsQuery.data || [], // ← 새로 추가
-
+    generals,
+    tactics,
+    tierDecks,
     isLoading,
-    error: generalsQuery.error || tacticsQuery.error || tierDecksQuery.error,
-    
-    // 선택된 자산 (필요 시)
-    selectedGenerals: [],
-    selectedTactics: [],
+    selectedGenerals: [],   // 필요시 상태 관리 추가
+    selectedTactics: []
   };
 }
