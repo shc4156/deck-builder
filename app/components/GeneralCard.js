@@ -1,3 +1,4 @@
+// components/GeneralCard.js
 import { generalRoleColors, generalRoleLabels, tagLabels } from '../../styles/roleColors';
 
 export default function GeneralCard({ general, isSelected, onSelect }) {
@@ -35,6 +36,53 @@ export default function GeneralCard({ general, isSelected, onSelect }) {
         borderRadius: '2px',
         cursor: 'pointer',
         textAlign: 'center',
+        transition: 'all 0.3s ease',
+        height: '250px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        fontFamily: 'var(--font-body)',
+        ...cardStyle
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+        <span style={{
+          fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '2px',
+          backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : roleStyle.bg,
+          border: `1px solid ${isSelected ? 'var(--gold-soft)' : roleStyle.border}`,
+          color: isSelected ? 'var(--gold-soft)' : roleStyle.text
+        }}>
+          {roleLabel}
+        </span>
+      </div>
+
+      <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 'bold' }}>{general.name}</h3>
+      <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
+        <p style={{ margin: '0' }}>진영: {general.faction}</p>
+        <p style={{ margin: '0' }}>포지션: {general.position}</p>
+        <p style={{ margin: '0' }}>병종: {general.troop_type || '정보없음'}</p>
+        <p style={{ margin: '0', fontWeight: 'bold', color: isSelected ? 'var(--gold-soft)' : 'var(--seal-dark)' }}>
+          {general.unique_tactic_name}
+        </p>
+      </div>
+
+      {secondaryRoles.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', flexWrap: 'wrap', marginTop: 'auto', paddingTop: '8px' }}>
+          {secondaryRoles.slice(0, 2).map((tag, idx) => (
+            <span key={idx} style={{
+              fontSize: '10px', padding: '1px 6px', borderRadius: '2px',
+              backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(43,35,24,0.06)',
+              border: `1px solid ${isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(43,35,24,0.2)'}`,
+              color: isSelected ? 'var(--paper-soft)' : 'rgba(43,35,24,0.65)'
+            }}>
+              {tagLabels[tag] || tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}        textAlign: 'center',
         transition: 'all 0.3s ease',
         height: '320px',
         display: 'flex',
