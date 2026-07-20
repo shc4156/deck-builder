@@ -1,107 +1,80 @@
 // hooks/useDeckAssets.js
 'use client';
-import { useState, useEffect } from 'react';
-import { supabase } from '../app/lib/supabaseClient'; // 실제 프로젝트 구조에 맞게 경로 조정 필요
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../app/lib/supabaseClient';
 
-// page.js와 matches/page.js가 공통으로 쓰는 상태(보유 장수/전법, 로그인 유저, 티어덱 목록 등)와
-// 그 상태를 채우는 로딩/저장 로직을 하나의 훅으로 묶음
 export function useDeckAssets() {
-  const [generals, setGenerals] = useState([]);
-  const [tactics, setTactics] = useState([]);
-  const [synergies, setSynergies] = useState([]);
-  const [tierDecks, setTierDecks] = useState([]);
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // 1. Generals
+  const generalsQuery = useQuery({
+    queryKey: ['generals'],
+    queryFn: async () => {
+      const { data } = await supabase.from('generals').select('*').order('name');
+      return data || [];
+    },
+  });
 
-  const [selectedGenerals, setSelectedGenerals] = useState([]);
-  const [selectedTactics, setSelectedTactics] = useState([]);
+  // 2. Tactics
+  const tacticsQuery = useQuery({
+    queryKey: ['tactics'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tactics').select('*').order('name');
+      return data || [];
+    },
+  });
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  // 3. Tier Decks
+  const tierDecksQuery = useQuery({
+    queryKey: ['tierDecks'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tier_decks').select('*').order('tier_name');
+      return data || [];
+    },
+  });
 
-  useEffect(() => {
-    async function getSession() {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-    }
-    getSession();
-  }, []);
+  // 4. General Roles (새로 추가)
+  const generalRolesQuery = useQuery({
+    queryKey: ['generalRoles'],
+    queryFn: async () => {
+      // Supabase 테이블이 있으면 아래 사용
+      // const { data } = await supabase.from('general_roles').select('*');
+      // return data || [];
 
-  useEffect(() => {
-    async function initData() {
-      setIsLoading(true);
-      try {
-        const [genRes, tactRes, synergyRes, tierRes] = await Promise.all([
-          supabase.from('generals').select('*').order('name'),
-          supabase.from('tactics').select('*').order('name'),
-          supabase.from('synergies').select('*'),
-          supabase.from('tier_decks').select('*').order('id')
-        ]);
+      // 아직 테이블이 없다면 JSON 파일에서 불러오기
+      const res = await fetch('/data/general_roles_rows.json');
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
-        setGenerals(genRes.data || []);
-        setTactics(tactRes.data || []);
-        setSynergies(synergyRes.data || []);
-        setTierDecks(tierRes.data || []);
+  // 5. General Connections (연계 데이터)
+  const connectionsQuery = useQuery({
+    queryKey: ['generalConnections'],
+    queryFn: async () => {
+      const res = await fetch('/data/general_connections_rows.json');
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
-        if (user && user.id) {
-          const { data: profileRes } = await supabase
-            .from('profiles')
-            .select('selected_generals, selected_tactics')
-            .eq('id', user.id)
-            .single();
-
-          if (profileRes) {
-            const loadedGens = profileRes.selected_generals ? profileRes.selected_generals.split(',') : [];
-            const loadedTacts = profileRes.selected_tactics ? profileRes.selected_tactics.split(',') : [];
-            setSelectedGenerals(loadedGens);
-            setSelectedTactics(loadedTacts);
-          }
-        }
-      } catch (err) {
-        console.error("데이터 로딩 중 에러가 발생했습니다:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    initData();
-  }, [user]);
-
-  const toggleGeneral = (id) => {
-    setSelectedGenerals(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const toggleTactic = (id) => {
-    setSelectedTactics(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const saveDeck = async () => {
-    if (!user) return alert('로그인이 필요합니다.');
-
-    setIsSaving(true);
-    setCountdown(3);
-    const timer = setInterval(() => setCountdown((prev) => prev - 1), 1000);
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        selected_generals: selectedGenerals.join(','),
-        selected_tactics: selectedTactics.join(',')
-      })
-      .eq('id', user.id);
-
-    clearInterval(timer);
-    setIsSaving(false);
-    setCountdown(0);
-
-    if (error) alert('저장 실패: ' + error.message);
-    else alert('보유 현황이 성공적으로 저장되었습니다!');
-  };
+  const isLoading = 
+    generalsQuery.isLoading || 
+    tacticsQuery.isLoading || 
+    tierDecksQuery.isLoading ||
+    generalRolesQuery.isLoading ||
+    connectionsQuery.isLoading;
 
   return {
-    generals, tactics, synergies, tierDecks, user, isLoading,
-    selectedGenerals, selectedTactics,
-    toggleGeneral, toggleTactic,
-    saveDeck, isSaving, countdown
+    generals: generalsQuery.data || [],
+    tactics: tacticsQuery.data || [],
+    tierDecks: tierDecksQuery.data || [],
+    generalRoles: generalRolesQuery.data || [],     // ← 새로 추가
+    generalConnections: connectionsQuery.data || [], // ← 새로 추가
+
+    isLoading,
+    error: generalsQuery.error || tacticsQuery.error || tierDecksQuery.error,
+    
+    // 선택된 자산 (필요 시)
+    selectedGenerals: [],
+    selectedTactics: [],
   };
 }
