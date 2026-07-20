@@ -1,6 +1,6 @@
 // app/matches/page.js
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import PageLayout from '../components/PageLayout';
 import FormationGridVisual from '../components/FormationGridVisual';
@@ -9,7 +9,7 @@ import GlossaryModal from '../components/GlossaryModal';
 import { getActiveSynergiesFromSetup, matchFormationInfo } from '../../data/synergies';
 import { findAlternativeTactics } from '../../data/tacticAlternatives';
 import { useDeckAssets } from '../../hooks/useDeckAssets';
-import { supabase } from '../lib/supabaseClient'; // Supabase 임포트 확인
+import { supabase } from '../lib/supabaseClient';
 
 export default function MatchesPage() {
   const {
@@ -18,9 +18,11 @@ export default function MatchesPage() {
   } = useDeckAssets();
 
   const [deckFilter, setDeckFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all'); // 새로 추가: 역할 필터
   const [glossaryTerm, setGlossaryTerm] = useState(null);
-  const [myPinnedDecks, setMyPinnedDecks] = useState([]); 
+  const [myPinnedDecks, setMyPinnedDecks] = useState([]);
 
+  // pinned decks 불러오기
   useEffect(() => {
     async function fetchPinnedDecks() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -31,10 +33,206 @@ export default function MatchesPage() {
           .eq('id', user.id)
           .single();
         
-        if (data?.pinned_decks) {
-          setMyPinnedDecks(data.pinned_decks);
-        }
+        if (data?.pinned_decks) setMyPinnedDecks(data.pinned_decks);
       }
+    }
+    fetchPinnedDecks();
+  }, []);
+
+  // deck_setup 안전 파싱
+  const parsedTierDecks = useMemo(() => {
+    return tierDecks.map(deck => ({
+      ...deck,
+      deck_setup: typeof deck.deck_setup === 'string' 
+        ? JSON.parse(deck.deck_setup) 
+        : (Array.isArray(deck.deck_setup) ? deck.deck_setup : [])
+    }));
+  }, [tierDecks]);
+
+  // 매칭 계산
+  const calculateMatch = (deck) => {
+    if (!deck.deck_setup?.length) {
+      return { totalPercent: 0, matchedGenCount: 0, matchedTactCount: 0 };
+    }
+
+    const deckGens = deck.deck_setup.map(g => g.general_name);
+    const deckTactics = deck.deck_setup.flatMap(g => g.added_tactics || []);
+
+    const myGenNames = generals
+      .filter(g => selectedGenerals.includes(g.id))
+      .map(g => g.name);
+
+    const myTactNames = tactics
+      .filter(t => selectedTactics.includes(t.id))
+      .map(t => t.name);
+
+    const matchedGenCount = deckGens.filter(name => myGenNames.includes(name)).length;
+    const matchedTactCount = deckTactics.filter(name => myTactNames.includes(name)).length;
+
+    const genScore = (matchedGenCount / 3) * 50;
+    const tactScore = deckTactics.length > 0 ? (matchedTactCount / deckTactics.length) * 50 : 0;
+
+    return {
+      totalPercent: Math.round(genScore + tactScore),
+      matchedGenCount,
+      matchedTactCount
+    };
+  };
+
+  // 필터링 + 정렬
+  const filteredDecks = useMemo(() => {
+    return parsedTierDecks
+      .filter(deck => {
+        if (deckFilter !== 'all' && deck.deck_type !== deckFilter) return false;
+        if (roleFilter !== 'all') {
+          // 역할 필터 (예: attack_carry 포함된 덱)
+          return deck.deck_setup.some(g => 
+            g.role_category?.includes(roleFilter)
+          );
+        }
+        return true;
+      })
+      .map(deck => ({
+        ...deck,
+        matchInfo: calculateMatch(deck)
+      }))
+      .sort((a, b) => {
+        const aPinned = myPinnedDecks.includes(a.id);
+        const bPinned = myPinnedDecks.includes(b.id);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        return b.matchInfo.totalPercent - a.matchInfo.totalPercent;
+      });
+  }, [parsedTierDecks, deckFilter, roleFilter, myPinnedDecks, generals, tactics, selectedGenerals, selectedTactics]);
+
+  const togglePin = async (deckId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    let newPins = [...myPinnedDecks];
+    if (newPins.includes(deckId)) {
+      newPins = newPins.filter(id => id !== deckId);
+    } else {
+      newPins.push(deckId);
+    }
+
+    setMyPinnedDecks(newPins);
+    await supabase.from('profiles').update({ pinned_decks: newPins }).eq('id', user.id);
+  };
+
+  if (isLoading) {
+    return (
+      <PageLayout>
+        <h1 className="classic-title text-3xl font-bold text-center" style={{ marginTop: '80px' }}>
+          천하 결전 무장 도감 데이터를 수집하고 있습니다...
+        </h1>
+      </PageLayout>
+    );
+  }
+
+  return (
+    <PageLayout>
+      <div style={{ padding: '25px', minHeight: '100vh' }}>
+        <nav className="classic-tabbar" style={{ marginBottom: '35px' }}>
+          <Link href="/?tab=my-assets" className="classic-tab">나의 보유 현황</Link>
+          <Link href="/?tab=dictionary" className="classic-tab">통합 도감</Link>
+          <span className="classic-tab active">티어덱 매칭</span>
+          <Link href="/squads" className="classic-tab">1-5군 추천 편성</Link>
+        </nav>
+
+        <h1 className="classic-heading text-3xl font-bold mb-2">티어덱 &amp; 개척추천 매칭</h1>
+        <p style={{ color: 'var(--gold-soft)', marginBottom: '30px', fontSize: '1.05rem', fontWeight: 500 }}>
+          현재 보유 자산을 기반으로 최적 티어덱을 추천합니다. 📌 핀 고정 시 최상단 유지
+        </p>
+
+        {/* 필터 영역 */}
+        <div className="classic-subtab-bar" style={{ marginBottom: '20px' }}>
+          <button onClick={() => setDeckFilter('all')} className={`classic-subtab ${deckFilter === 'all' ? 'active' : ''}`}>
+            전체 ({tierDecks.length})
+          </button>
+          <button onClick={() => setDeckFilter('tier')} className={`classic-subtab ${deckFilter === 'tier' ? 'active' : ''}`}>
+            종결 티어덱
+          </button>
+          <button onClick={() => setDeckFilter('start')} className={`classic-subtab ${deckFilter === 'start' ? 'active' : ''}`}>
+            개척 추천덱
+          </button>
+        </div>
+
+        {/* 역할 필터 */}
+        <div style={{ marginBottom: '25px' }}>
+          <label style={{ marginRight: '10px', fontWeight: 'bold' }}>역할 필터:</label>
+          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={{ padding: '8px' }}>
+            <option value="all">전체</option>
+            <option value="attack_carry">공격 Carry</option>
+            <option value="support_engine">지원 Engine</option>
+            <option value="support_amplifier">증폭 Amplifier</option>
+            <option value="support_sustain">생존 Sustain</option>
+            <option value="control_trigger">제어 Trigger</option>
+          </select>
+        </div>
+
+        <div className="deck-general-grid">
+          {filteredDecks.map(deck => {
+            const { totalPercent } = deck.matchInfo;
+            const isStartDeck = deck.deck_type === 'start';
+            const formationInfo = matchFormationInfo(deck.formation_grid);
+            const isPinned = myPinnedDecks.includes(deck.id);
+            const safeSetup = deck.deck_setup;
+
+            return (
+              <div key={deck.id} className="scroll-panel" style={{
+                padding: '28px',
+                position: 'relative',
+                border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)',
+                boxShadow: isPinned ? '0 0 12px rgba(184,147,90,0.3)' : 'none'
+              }}>
+                {/* 핀 버튼 */}
+                <button onClick={() => togglePin(deck.id)} style={{
+                  position: 'absolute', top: '20px', left: '20px', fontSize: '1.6rem', zIndex: 10
+                }}>
+                  {isPinned ? '📌' : '📍'}
+                </button>
+
+                <div style={{ position: 'absolute', top: '20px', right: '20px', textAlign: 'right' }}>
+                  <span style={{ padding: '4px 12px', backgroundColor: isStartDeck ? 'var(--jade)' : 'var(--seal)', color: 'white', fontSize: '0.9rem', borderRadius: '4px' }}>
+                    {isStartDeck ? '개척' : '종결'}
+                  </span>
+                  <span style={{ fontSize: '2.2rem', fontWeight: '900', marginLeft: '12px', color: totalPercent >= 80 ? 'var(--seal)' : 'var(--gold)' }}>
+                    {totalPercent}%
+                  </span>
+                </div>
+
+                <h3 className="deck-title" style={{ paddingLeft: '40px' }}>{deck.tier_name}</h3>
+
+                <FormationGridVisual gridData={deck.formation_grid} />
+
+                {/* 장수별 정보 */}
+                <div className="deck-general-grid" style={{ margin: '20px 0' }}>
+                  {safeSetup.map((gSetup, idx) => {
+                    const isOwned = selectedGenerals.some(id => generals.find(g => g.id === id)?.name === gSetup.general_name);
+                    return (
+                      <div key={idx} style={{
+                        border: isOwned ? '2px solid var(--jade)' : '1px dashed #ccc',
+                        padding: '15px',
+                        opacity: isOwned ? 1 : 0.7
+                      }}>
+                        <strong>{gSetup.general_name}</strong>
+                        <div>속성: {gSetup.stat_focus}</div>
+                        <div>추천 전법: {gSetup.added_tactics?.join(', ')}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <GlossaryModal term={glossaryTerm} onClose={() => setGlossaryTerm(null)} />
+    </PageLayout>
+  );
+}      }
     }
     fetchPinnedDecks();
   }, []);
