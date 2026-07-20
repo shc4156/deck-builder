@@ -1,10 +1,5 @@
-import { tacticRoleColors, tacticRoleLabels, tagLabels } from '../../styles/roleColors';
-
+// components/TacticCard.js
 export default function TacticCard({ tactic, isSelected, onSelect }) {
-  const roleStyle = tacticRoleColors[tactic.type] || tacticRoleColors[tactic.primary_role] || { bg: 'rgba(142,115,91,0.15)', border: '#8e735b', text: '#5c4a3a' };
-  const roleLabel = tacticRoleLabels[tactic.type] || tacticRoleLabels[tactic.primary_role] || tactic.type || tactic.primary_role || '전법';
-  const tags = tactic.tags || [];
-
   return (
     <div
       onClick={() => onSelect(tactic)}
@@ -15,26 +10,23 @@ export default function TacticCard({ tactic, isSelected, onSelect }) {
         backgroundColor: isSelected ? 'var(--paper-soft)' : 'white',
         cursor: 'pointer',
         transition: 'all 0.2s',
-        height: '280px',
+        height: '220px',
         display: 'flex',
         flexDirection: 'column'
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
-        <span style={{
-          fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '2px',
-          backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : roleStyle.bg,
-          border: `1px solid ${isSelected ? 'var(--gold-soft)' : roleStyle.border}`,
-          color: isSelected ? 'var(--gold-soft)' : roleStyle.text
-        }}>
-          {roleLabel}
-        </span>
+      <h3 style={{ margin: '0 0 12px 0', fontSize: '1.3rem' }}>{tactic.name}</h3>
+      
+      <div style={{ fontSize: '0.95rem', marginBottom: '12px', flex: 1 }}>
+        {tactic.effect || '효과 정보 없음'}
       </div>
 
-      <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 'bold', textAlign: 'center' }}>{tactic.name}</h3>
-
-      <p style={{
-        fontSize: '13px',
+      <div style={{ marginTop: 'auto', fontSize: '0.85rem', color: '#666' }}>
+        {tactic.category || '분류 없음'}
+      </div>
+    </div>
+  );
+}        fontSize: '13px',
         margin: '0 0 10px 0',
         opacity: 0.9,
         lineHeight: '1.5',
