@@ -1,3 +1,4 @@
+// app/tactics/page.js
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
@@ -8,9 +9,8 @@ export default function TacticsPage() {
   const [tactics, setTactics] = useState([]);
   const [selectedTactic, setSelectedTactic] = useState(null);
 
-useEffect(() => {
+  useEffect(() => {
     async function fetchTactics() {
-      // .order('name', { ascending: true })를 추가했습니다.
       const { data } = await supabase
         .from('tactics')
         .select('*')
