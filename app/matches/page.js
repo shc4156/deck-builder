@@ -1,6 +1,6 @@
 // app/matches/page.js
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PageLayout from '../components/PageLayout';
 import FormationGridVisual from '../components/FormationGridVisual';
@@ -12,11 +12,14 @@ import { useDeckAssets } from '../../hooks/useDeckAssets';
 import { supabase } from '../lib/supabaseClient';
 
 export default function MatchesPage() {
-  const { generals, tactics, tierDecks, isLoading, selectedGenerals, selectedTactics } = useDeckAssets();
+  const {
+    generals, tactics, tierDecks, isLoading,
+    selectedGenerals, selectedTactics
+  } = useDeckAssets();
 
   const [deckFilter, setDeckFilter] = useState('all');
   const [glossaryTerm, setGlossaryTerm] = useState(null);
-  const [myPinnedDecks, setMyPinnedDecks] = useState([]);
+  const [myPinnedDecks, setMyPinnedDecks] = useState([]); 
 
   useEffect(() => {
     async function fetchPinnedDecks() {
@@ -36,17 +39,10 @@ export default function MatchesPage() {
     fetchPinnedDecks();
   }, []);
 
-  const parsedTierDecks = useMemo(() => {
-    return tierDecks.map(deck => ({
-      ...deck,
-      deck_setup: typeof deck.deck_setup === 'string' 
-        ? JSON.parse(deck.deck_setup) 
-        : (Array.isArray(deck.deck_setup) ? deck.deck_setup : [])
-    }));
-  }, [tierDecks]);
-
   const calculateMatch = (deck) => {
-    if (!deck.deck_setup?.length) return { totalPercent: 0 };
+    if (!deck.deck_setup || !Array.isArray(deck.deck_setup)) {
+      return { totalPercent: 0, matchedGenCount: 0, matchedTactCount: 0, deckGens: [], deckTactics: [], myGenNames: [], myTactNames: [] };
+    }
 
     const deckGens = deck.deck_setup.map(g => g.general_name);
     const deckTactics = deck.deck_setup.flatMap(g => g.added_tactics || []);
@@ -54,38 +50,53 @@ export default function MatchesPage() {
     const myGenNames = generals
       .filter(g => selectedGenerals.includes(g.id))
       .map(g => g.name);
+    const matchedGenCount = deckGens.filter(name => myGenNames.includes(name)).length;
 
     const myTactNames = tactics
       .filter(t => selectedTactics.includes(t.id))
       .map(t => t.name);
+    const matchedTactCount = deckTactics.filter(name => myTactNames.includes(name)).length;
 
-    const matchedGen = deckGens.filter(name => myGenNames.includes(name)).length;
-    const matchedTact = deckTactics.filter(name => myTactNames.includes(name)).length;
+    const genScore = (matchedGenCount / 3) * 50;
+    const tactScore = deckTactics.length > 0 ? (matchedTactCount / deckTactics.length) * 50 : 0;
+    const totalPercent = Math.round(genScore + tactScore);
 
-    const genScore = (matchedGen / 3) * 50;
-    const tactScore = deckTactics.length ? (matchedTact / deckTactics.length) * 50 : 0;
-
-    return { totalPercent: Math.round(genScore + tactScore) };
+    return {
+      totalPercent,
+      matchedGenCount,
+      matchedTactCount,
+      deckGens,
+      deckTactics,
+      myGenNames,
+      myTactNames
+    };
   };
 
-  const filteredDecks = useMemo(() => {
-    return parsedTierDecks
-      .filter(deck => deckFilter === 'all' || deck.deck_type === deckFilter)
-      .map(deck => ({ ...deck, matchInfo: calculateMatch(deck) }))
-      .sort((a, b) => {
-        const aPinned = myPinnedDecks.includes(a.id);
-        const bPinned = myPinnedDecks.includes(b.id);
-        if (aPinned && !bPinned) return -1;
-        if (!aPinned && bPinned) return 1;
-        return b.matchInfo.totalPercent - a.matchInfo.totalPercent;
-      });
-  }, [parsedTierDecks, deckFilter, myPinnedDecks, generals, tactics, selectedGenerals, selectedTactics]);
+  const filteredDecks = tierDecks
+    .filter(deck => {
+      if (deckFilter === 'all') return true;
+      return deck.deck_type === deckFilter;
+    })
+    .map(deck => ({
+      ...deck,
+      matchInfo: calculateMatch(deck)
+    }))
+    .sort((a, b) => {
+      const aPinned = myPinnedDecks.includes(a.id);
+      const bPinned = myPinnedDecks.includes(b.id);
+
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+
+      return b.matchInfo.totalPercent - a.matchInfo.totalPercent;
+    });
 
   const togglePin = async (deckId) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     let newPins = [...myPinnedDecks];
+    
     if (newPins.includes(deckId)) {
       newPins = newPins.filter(id => id !== deckId);
     } else {
@@ -118,27 +129,27 @@ export default function MatchesPage() {
 
         <h1 className="classic-heading text-3xl font-bold mb-2">티어덱 &amp; 개척추천 매칭</h1>
         <p style={{ color: 'var(--gold-soft)', marginBottom: '30px', fontSize: '1.05rem', fontWeight: 500 }}>
-          현재 보유하신 막사 자산을 토대로 최적의 군사 배치를 정렬하여 제안합니다. (📌 핀 고정 시 최상단)
+          현재 보유하신 막사 자산을 토대로 천하를 호령할 수 있는 최적의 군사 배치를 정렬하여 제안합니다. (📌 핀 고정 시 최상단 고정)
         </p>
 
-        <div className="classic-subtab-bar" style={{ marginBottom: '25px' }}>
+        <div className="classic-subtab-bar">
           <button onClick={() => setDeckFilter('all')} className={`classic-subtab ${deckFilter === 'all' ? 'active' : ''}`}>
-            전체
+            전체 전략표 ({tierDecks.length})
           </button>
           <button onClick={() => setDeckFilter('tier')} className={`classic-subtab ${deckFilter === 'tier' ? 'active' : ''}`}>
-            종결 티어덱
+            종결 티어덱 ({tierDecks.filter(d => d.deck_type === 'tier').length})
           </button>
           <button onClick={() => setDeckFilter('start')} className={`classic-subtab ${deckFilter === 'start' ? 'active' : ''}`}>
-            개척 추천덱
+            개척 추천덱 ({tierDecks.filter(d => d.deck_type === 'start').length})
           </button>
         </div>
 
-        <div className="deck-general-grid">
+        <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
           {filteredDecks.map(deck => {
-            const { totalPercent } = deck.matchInfo || { totalPercent: 0 };
+            const { totalPercent, myGenNames, myTactNames } = deck.matchInfo;
             const isStartDeck = deck.deck_type === 'start';
+            const formationInfo = matchFormationInfo(deck.formation_grid);
             const isPinned = myPinnedDecks.includes(deck.id);
-            const safeSetup = deck.deck_setup || [];
 
             return (
               <div 
@@ -147,30 +158,162 @@ export default function MatchesPage() {
                 style={{ 
                   padding: '28px', 
                   position: 'relative',
-                  border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)'
+                  border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)',
+                  boxShadow: isPinned ? '0 0 10px rgba(184,147,90,0.2)' : 'none'
                 }}
               >
-                <button onClick={() => togglePin(deck.id)} style={{ position: 'absolute', top: '24px', left: '24px', fontSize: '1.6rem' }}>
-                  {isPinned ? '📌' : '📍'}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    togglePin(deck.id);
+                  }}
+                  style={{ 
+                    position: 'absolute', top: '24px', left: '24px', 
+                    fontSize: '1.5rem', cursor: 'pointer', background: 'transparent', border: 'none', zIndex: 10,
+                    filter: isPinned ? 'none' : 'grayscale(100%) opacity(0.6)'
+                  }}
+                  title={isPinned ? "고정 해제" : "최상단 고정"}
+                >
+                  📌
                 </button>
 
-                <div style={{ position: 'absolute', top: '24px', right: '28px' }}>
-                  <span style={{ padding: '5px 12px', backgroundColor: isStartDeck ? 'var(--jade)' : 'var(--seal)', color: 'white' }}>
-                    {isStartDeck ? '개척' : '종결'}
+                <div style={{ position: 'absolute', top: '24px', right: '28px', textAlign: 'right' }}>
+                  <span style={{
+                    padding: '5px 10px', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--paper-soft)',
+                    backgroundColor: isStartDeck ? 'var(--jade)' : 'var(--seal)', marginRight: '14px', verticalAlign: 'middle', letterSpacing: '1px'
+                  }}>
+                    {isStartDeck ? '개척추천' : '종결진격'}
                   </span>
-                  <span style={{ fontSize: '2.1rem', fontWeight: '900', marginLeft: '12px' }}>
+                  <span style={{
+                    fontSize: '2.1rem', fontWeight: '900', verticalAlign: 'middle', fontFamily: 'var(--font-display)',
+                    color: totalPercent >= 85 ? 'var(--seal)' : totalPercent >= 60 ? 'var(--gold)' : 'var(--ink-text)'
+                  }}>
                     {totalPercent}%
                   </span>
                 </div>
 
-                <h3 className="deck-title" style={{ paddingLeft: '45px' }}>{deck.tier_name}</h3>
-
-                <div style={{ margin: '20px 0' }}>
-                  {safeSetup.map((g, idx) => (
-                    <div key={idx} style={{ padding: '12px', border: '1px solid #ddd', marginBottom: '8px' }}>
-                      <strong>{g.general_name}</strong> — {g.stat_focus || '속성 미정'}
-                    </div>
+                <h3 className="deck-title classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '14px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%', paddingLeft: '35px' }}>
+                  {deck.tier_name}
+                </h3>
+                
+                <div style={{ margin: '15px 0', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {getActiveSynergiesFromSetup(deck.deck_setup).map((s, idx) => (
+                    <span key={idx} style={{
+                      padding: '4px 10px',
+                      backgroundColor: 'rgba(166, 50, 42, 0.08)',
+                      border: '1px solid var(--seal)',
+                      color: 'var(--seal-dark)',
+                      fontSize: '0.85rem',
+                      fontWeight: '900'
+                    }}>
+                      [{s.name}] <GlossaryText text={s.effect} onTermClick={setGlossaryTerm} />
+                    </span>
                   ))}
+                </div>
+
+                <div style={{ marginBottom: '25px', fontSize: '1.05rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--paper-soft)', padding: '14px 20px', border: '1px solid rgba(184,147,90,0.35)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <span style={{ backgroundColor: 'var(--seal)', padding: '4px 10px', fontWeight: 'bold', color: 'var(--paper-soft)', fontSize: '0.85rem' }}>추천 군진</span>
+                      <span style={{ fontWeight: '900', color: 'var(--seal-dark)', fontSize: '1.2rem' }}>{formationInfo.name}</span>
+                    </div>
+                    <div style={{ fontSize: '1.05rem', color: 'var(--ink-text)', fontWeight: 'bold', marginTop: '4px', paddingLeft: '2px' }}>
+                      군진효과: {formationInfo.effect}
+                    </div>
+                  </div>
+                  <FormationGridVisual gridData={deck.formation_grid} />
+                </div>
+
+                <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
+                  {deck.deck_setup.map((gSetup, idx) => {
+                    const isGenOwned = myGenNames.includes(gSetup.general_name);
+                    const matchedGeneralData = generals.find(g => g.name === gSetup.general_name);
+                    const dbImageUrl = matchedGeneralData?.image_url || '/images/generals/default.jpg';
+
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          border: isGenOwned ? '3px solid var(--seal)' : '1px dashed rgba(184,147,90,0.4)',
+                          padding: '16px',
+                          backgroundColor: isGenOwned ? 'var(--paper-soft)' : 'rgba(232,220,192,0.5)',
+                          filter: isGenOwned ? 'none' : 'grayscale(60%)',
+                          opacity: isGenOwned ? 1 : 0.75,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '14px' }}>
+                            <div style={{ width: '55px', height: '50px', overflow: 'hidden', backgroundColor: 'var(--paper)', border: '2px solid var(--gold)', flexShrink: 0 }}>
+                              <img src={dbImageUrl} alt={gSetup.general_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = '/images/generals/default.jpg'; }} />
+                            </div>
+                            <div>
+                              <span style={{ fontSize: '1.3rem', fontWeight: '900', color: 'var(--ink-text)', letterSpacing: '0.5px' }}>
+                                {gSetup.general_name}
+                              </span>
+                              <div style={{ fontSize: '0.88rem', color: 'var(--paper-soft)', marginTop: '5px', fontWeight: 'bold', backgroundColor: 'var(--ink-text)', padding: '2px 7px', width: 'fit-content' }}>
+                                속성: {gSetup.stat_focus}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ borderTop: '2px dashed rgba(184,147,90,0.4)', paddingTop: '12px', marginBottom: '14px' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '8px', fontWeight: 'bold', letterSpacing: '0.5px' }}>추천 전법</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {gSetup.added_tactics && gSetup.added_tactics.map((tName, tIdx) => {
+                                const isTacticOwnedInProfile = myTactNames.includes(tName);
+                                const matchedTacticData = tactics.find(t => t.name === tName);
+
+                                return (
+                                  <div key={tIdx} style={{ marginBottom: '4px' }}>
+                                    <div style={{
+                                      padding: '7px 12px', fontSize: '0.95rem', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                      backgroundColor: isTacticOwnedInProfile ? 'rgba(63,93,84,0.12)' : 'rgba(43,35,24,0.05)',
+                                      color: isTacticOwnedInProfile ? 'var(--jade)' : 'rgba(43,35,24,0.55)',
+                                      border: isTacticOwnedInProfile ? '2px solid var(--jade)' : '2px solid rgba(43,35,24,0.2)'
+                                    }}>
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {matchedTacticData?.image_url && (
+                                          <img
+                                            src={matchedTacticData.image_url}
+                                            alt={tName}
+                                            style={{ width: '22px', height: '30px', objectFit: 'cover', border: '1px solid var(--gold)' }}
+                                          />
+                                        )}
+                                        {tName}
+                                      </span>
+                                      <span style={{ fontSize: '0.85rem' }}>{isTacticOwnedInProfile ? '✓' : '✗'}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{
+                  borderTop: '2px solid var(--gold)',
+                  fontSize: '0.95rem',
+                  backgroundColor: 'var(--paper-soft)',
+                  padding: '14px 18px',
+                  marginTop: '10px'
+                }}>
+                  <span style={{ fontWeight: 'bold', color: 'var(--seal-dark)', display: 'block', marginBottom: '8px', fontSize: '1.05rem' }}>
+                    장비 추천 속성 가이드
+                  </span>
+                  <div style={{ color: 'var(--ink-text)', lineHeight: '1.5', display: 'flex', flexWrap: 'wrap', gap: '20px', fontWeight: 'bold' }}>
+                    {deck.deck_setup.map((g, i) => (
+                      <div key={i}>
+                        <span style={{ color: 'var(--seal-dark)' }}>{g.general_name}</span>: {g.equipment_options ? g.equipment_options.join(' / ') : '속성 조율 중'}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
@@ -181,4 +324,4 @@ export default function MatchesPage() {
       <GlossaryModal term={glossaryTerm} onClose={() => setGlossaryTerm(null)} />
     </PageLayout>
   );
-}
+                                        }
