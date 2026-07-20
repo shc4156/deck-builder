@@ -1,169 +1,40 @@
-// components/TacticCard.js
+import { tacticRoleColors, tacticRoleLabels, tagLabels } from '../../styles/roleColors';
+
 export default function TacticCard({ tactic, isSelected, onSelect }) {
+  const roleStyle = tacticRoleColors[tactic.role] || { bg: 'rgba(142,115,91,0.15)', border: '#8e735b', text: '#5c4a3a' };
+  const roleLabel = tacticRoleLabels[tactic.role] || tactic.role;
+  const tags = tactic.tags || [];
+
+  const cardStyle = isSelected && tactic.image_url
+    ? {
+        backgroundImage: `linear-gradient(rgba(28,24,21,0.75), rgba(28,24,21,0.75)), url('${tactic.image_url}')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        color: 'var(--paper-soft)',
+        border: '3px solid var(--seal)',
+        boxShadow: '0 0 0 3px rgba(166,50,42,0.25)',
+        textShadow: '1px 1px 3px #000'
+      }
+    : {
+        backgroundColor: 'var(--paper-soft)',
+        color: 'var(--ink-text)',
+        border: '3px double var(--gold)',
+        borderLeft: `6px solid ${roleStyle.border}` // 역할별 좌측 컬러바 - 도감에서 한눈에 구분되도록
+      };
+
   return (
     <div
       onClick={() => onSelect(tactic)}
       style={{
-        padding: '20px',
-        border: isSelected ? '3px solid var(--seal)' : '2px solid #ddd',
-        borderRadius: '8px',
-        backgroundColor: isSelected ? 'var(--paper-soft)' : 'white',
-        cursor: 'pointer',
-        transition: 'all 0.2s',
-        height: '220px',
-        display: 'flex',
-        flexDirection: 'column'
+        padding: '16px', borderRadius: '2px', cursor: 'pointer',
+        textAlign: 'center', height: '220px', display: 'flex',
+        flexDirection: 'column', justifyContent: 'flex-start',
+        fontFamily: 'var(--font-body)',
+        transition: 'all 0.3s ease', ...cardStyle
       }}
     >
-      <h3 style={{ margin: '0 0 12px 0', fontSize: '1.3rem' }}>{tactic.name}</h3>
-      
-      <div style={{ fontSize: '0.95rem', marginBottom: '12px', flex: 1 }}>
-        {tactic.effect || '효과 정보 없음'}
-      </div>
-
-      <div style={{ marginTop: 'auto', fontSize: '0.85rem', color: '#666' }}>
-        {tactic.category || '분류 없음'}
-      </div>
-    </div>
-  );
-}        fontSize: '13px',
-        margin: '0 0 10px 0',
-        opacity: 0.9,
-        lineHeight: '1.5',
-        display: '-webkit-box',
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis'
-      }}>
-        {tactic.description || tactic.effect || '효과 정보 없음'}
-      </p>
-
-      {/* 추천 장수 표시 */}
-      {tactic.recommended_generals && tactic.recommended_generals.length > 0 && (
-        <div style={{ marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid #eee' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '4px', color: '#8e735b' }}>
-            추천 장수
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {tactic.recommended_generals.slice(0, 4).map((gen, idx) => (
-              <span key={idx} style={{
-                fontSize: '0.75rem',
-                padding: '2px 6px',
-                backgroundColor: '#f4e8d1',
-                borderRadius: '4px',
-                color: '#5c4a3a'
-              }}>
-                {gen}
-              </span>
-            ))}
-            {tactic.recommended_generals.length > 4 && (
-              <span style={{ fontSize: '0.75rem', color: '#888' }}>
-                +{tactic.recommended_generals.length - 4}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 부가특성 태그 */}
-      {tags.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
-          {tags.slice(0, 3).map((tag, idx) => (
-            <span key={idx} style={{
-              fontSize: '10px', padding: '1px 6px', borderRadius: '2px',
-              backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(43,35,24,0.06)',
-              border: `1px solid ${isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(43,35,24,0.2)'}`,
-              color: isSelected ? 'var(--paper-soft)' : 'rgba(43,35,24,0.65)'
-            }}>
-              {tagLabels[tag] || tag}
-            </span>
-          ))}
-          {tags.length > 3 && (
-            <span style={{ fontSize: '10px', opacity: 0.6 }}>+{tags.length - 3}</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-        fontSize: '13px',
-        margin: '0 0 10px 0',
-        opacity: 0.9,
-        lineHeight: '1.5',
-        display: '-webkit-box',
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis'
-      }}>
-        {tactic.description || tactic.effect || '효과 정보 없음'}
-      </p>
-
-      {/* 추천 장수 표시 */}
-      {tactic.recommended_generals && tactic.recommended_generals.length > 0 && (
-        <div style={{ marginTop: 'auto', paddingTop: '8px', borderTop: '1px solid #eee' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '4px', color: '#8e735b' }}>
-            추천 장수
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {tactic.recommended_generals.slice(0, 4).map((gen, idx) => (
-              <span key={idx} style={{
-                fontSize: '0.75rem',
-                padding: '2px 6px',
-                backgroundColor: '#f4e8d1',
-                borderRadius: '4px',
-                color: '#5c4a3a'
-              }}>
-                {gen}
-              </span>
-            ))}
-            {tactic.recommended_generals.length > 4 && (
-              <span style={{ fontSize: '0.75rem', color: '#888' }}>
-                +{tactic.recommended_generals.length - 4}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 부가특성 태그 */}
-      {tags.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
-          {tags.slice(0, 3).map((tag, idx) => (
-            <span key={idx} style={{
-              fontSize: '10px', padding: '1px 6px', borderRadius: '2px',
-              backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(43,35,24,0.06)',
-              border: `1px solid ${isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(43,35,24,0.2)'}`,
-              color: isSelected ? 'var(--paper-soft)' : 'rgba(43,35,24,0.65)'
-            }}>
-              {tagLabels[tag] || tag}
-            </span>
-          ))}
-          {tags.length > 3 && (
-            <span style={{ fontSize: '10px', opacity: 0.6 }}>+{tags.length - 3}</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-                color: '#5c4a3a'
-              }}>
-                {gen}
-              </span>
-            ))}
-            {tactic.recommended_generals.length > 6 && (
-              <span style={{ fontSize: '0.8rem', color: '#888' }}>
-                +{tactic.recommended_generals.length - 6}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+      {/* 역할 배지: 선택 여부와 무관하게 항상 표시, 선택 시엔 어두운 배경 위라 텍스트만 밝게 조정 */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
         <span style={{
           fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '2px',
           backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : roleStyle.bg,
