@@ -1,3 +1,4 @@
+// components/GeneralCard.js
 import { generalRoleColors, generalRoleLabels, tagLabels } from '../../styles/roleColors';
 
 export default function GeneralCard({ general, isSelected, onSelect }) {
@@ -10,7 +11,6 @@ export default function GeneralCard({ general, isSelected, onSelect }) {
   const roleLabel = generalRoleLabels[general.primary_role] || general.primary_role;
   const secondaryRoles = general.secondary_roles || [];
 
-  // 선택 전후 스타일 정의
   const cardStyle = isSelected && general.image_url
     ? {
         backgroundImage: `linear-gradient(rgba(28,24,21,0.75), rgba(28,24,21,0.75)), url('${general.image_url}')`,
@@ -19,13 +19,13 @@ export default function GeneralCard({ general, isSelected, onSelect }) {
         color: 'var(--paper-soft)',
         border: '3px solid var(--seal)',
         boxShadow: '0 0 0 3px rgba(166,50,42,0.25)',
-        textShadow: '1px 1px 3px #000' // 어두운 배경 위에서 글자 강조
+        textShadow: '1px 1px 3px #000'
       }
     : {
         backgroundColor: 'var(--paper-soft)',
         color: 'var(--ink-text)',
         border: '3px double var(--gold)',
-        borderLeft: `6px solid ${borderColor}` // 진영색은 그대로 좌측 컬러바로 유지
+        borderLeft: `6px solid ${borderColor}`
       };
 
   return (
@@ -35,6 +35,76 @@ export default function GeneralCard({ general, isSelected, onSelect }) {
         padding: '16px',
         borderRadius: '2px',
         cursor: 'pointer',
+        textAlign: 'center',
+        transition: 'all 0.3s ease',
+        height: '320px',           // 추천 전법 표시 공간 확보
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        fontFamily: 'var(--font-body)',
+        ...cardStyle
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+        <span style={{
+          fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '2px',
+          backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : roleStyle.bg,
+          border: `1px solid ${isSelected ? 'var(--gold-soft)' : roleStyle.border}`,
+          color: isSelected ? 'var(--gold-soft)' : roleStyle.text
+        }}>
+          {roleLabel}
+        </span>
+      </div>
+
+      <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 'bold' }}>{general.name}</h3>
+      <div style={{ fontSize: '13px', lineHeight: '1.8', marginBottom: '12px' }}>
+        <p style={{ margin: '0' }}>진영: {general.faction}</p>
+        <p style={{ margin: '0' }}>포지션: {general.position}</p>
+        <p style={{ margin: '0' }}>병종: {general.troop_type || '정보없음'}</p>
+      </div>
+
+      {/* 추천 전법 표시 */}
+      {general.recommended_tactics && general.recommended_tactics.length > 0 && (
+        <div style={{ 
+          marginTop: 'auto', 
+          padding: '10px', 
+          backgroundColor: isSelected ? 'rgba(0,0,0,0.3)' : 'rgba(43,35,24,0.08)', 
+          borderRadius: '4px',
+          fontSize: '12px',
+          textAlign: 'left'
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '6px', color: isSelected ? '#ffd700' : '#8e735b' }}>
+            추천 전법
+          </div>
+          <ul style={{ margin: 0, paddingLeft: '16px', lineHeight: '1.4' }}>
+            {general.recommended_tactics.slice(0, 5).map((tactic, idx) => (
+              <li key={idx} style={{ marginBottom: '2px' }}>{tactic}</li>
+            ))}
+            {general.recommended_tactics.length > 5 && (
+              <li style={{ color: isSelected ? '#ccc' : '#777' }}>+ {general.recommended_tactics.length - 5}개 더</li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* 부역할 태그 */}
+      {secondaryRoles.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '8px' }}>
+          {secondaryRoles.slice(0, 2).map((tag, idx) => (
+            <span key={idx} style={{
+              fontSize: '10px', padding: '1px 6px', borderRadius: '2px',
+              backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(43,35,24,0.06)',
+              border: `1px solid ${isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(43,35,24,0.2)'}`,
+              color: isSelected ? 'var(--paper-soft)' : 'rgba(43,35,24,0.65)'
+            }}>
+              {tagLabels[tag] || tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}        cursor: 'pointer',
         textAlign: 'center',
         transition: 'all 0.3s ease',
         height: '250px', // 역할 배지 추가로 살짝 더 키움
