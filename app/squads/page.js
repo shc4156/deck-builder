@@ -1,4 +1,3 @@
-// app/squads/page.js
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -11,8 +10,6 @@ import { useDeckAssets } from '../../hooks/useDeckAssets';
 import { supabase } from '../lib/supabaseClient';
 import { buildOptimalSquads } from '../../utils/squadEngine';
 
-<<<<<<< HEAD
-=======
 // 도장(낙관) 하나를 그려주는 작은 컴포넌트. 손도장 느낌을 위해 개체마다
 // 살짝 다른 각도로 회전시킨다.
 function SealStamp({ label, tone = 'general', rotate = 0 }) {
@@ -46,7 +43,6 @@ function SealStamp({ label, tone = 'general', rotate = 0 }) {
   );
 }
 
->>>>>>> d4eb085 (전체 수정)
 export default function AutoSquadsPage() {
   const COMING_SOON = true; // 배포 전 이 값만 false로 바꾸면 원래 기능 복구
 
@@ -105,13 +101,9 @@ export default function AutoSquadsPage() {
     setEditingSlot(null); // 편집 완료 후 모달 닫기
   };
 
-<<<<<<< HEAD
-  const [myPinnedDecks, setMyPinnedDecks] = useState([]);
-=======
   // 티어덱 고정 대신 "반드시 포함할 장수" 목록으로 전환
   const [myPinnedGenerals, setMyPinnedGenerals] = useState([]);
   const [myNickname, setMyNickname] = useState('');
->>>>>>> d4eb085 (전체 수정)
 
   const myGenNames = useMemo(() => 
     generals.filter(g => selectedGenerals.includes(g.id)).map(g => g.name.trim()),
@@ -122,16 +114,6 @@ export default function AutoSquadsPage() {
   [tactics, selectedTactics]);
 
   useEffect(() => {
-<<<<<<< HEAD
-    async function fetchPinnedDecks() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from('profiles').select('pinned_decks').eq('id', user.id).single();
-        if (data?.pinned_decks) setMyPinnedDecks(data.pinned_decks);
-      }
-    }
-    fetchPinnedDecks();
-=======
     async function fetchProfile() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -143,7 +125,6 @@ export default function AutoSquadsPage() {
       }
     }
     fetchProfile();
->>>>>>> d4eb085 (전체 수정)
   }, []);
 
   // 외부 엔진을 통해 1-5군 생성 위임
@@ -153,19 +134,11 @@ export default function AutoSquadsPage() {
 
     const generatedSquads = buildOptimalSquads({
       tierDecks, generals, tactics, myGenNames, myTactNames, 
-<<<<<<< HEAD
-      pinnedDeckIds: myPinnedDecks, selectedTactics
-    });
-
-    setSquads(generatedSquads);
-  }, [isLoading, tierDecks, generals, tactics, myGenNames, myTactNames, myPinnedDecks, selectedTactics]);
-=======
       pinnedGeneralNames: myPinnedGenerals, selectedTactics
     });
 
     setSquads(generatedSquads);
   }, [isLoading, tierDecks, generals, tactics, myGenNames, myTactNames, myPinnedGenerals, selectedTactics]);
->>>>>>> d4eb085 (전체 수정)
 
   if (isLoading) {
     return (
@@ -200,12 +173,6 @@ export default function AutoSquadsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
             {squads.map(deck => {
               const formationInfo = matchFormationInfo(deck.formation_grid);
-<<<<<<< HEAD
-              const isPinned = myPinnedDecks.includes(deck.id);
-
-              return (
-                <div key={`${deck.id}-${deck.squadNum}`} className="scroll-panel" style={{ padding: '28px', border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)' }}>
-=======
               const isPinned = deck.deck_setup.some(g => myPinnedGenerals.includes(g.general_name));
               const activeSynergies = getActiveSynergiesFromSetup
                 ? (getActiveSynergiesFromSetup(deck.deck_setup) || [])
@@ -230,7 +197,6 @@ export default function AutoSquadsPage() {
                     </div>
                   </div>
 
->>>>>>> d4eb085 (전체 수정)
                   <div style={{ position: 'absolute', top: '24px', right: '28px', textAlign: 'right' }}>
                     <span style={{ padding: '5px 12px', fontSize: '1rem', fontWeight: 'bold', color: 'var(--paper-soft)', backgroundColor: 'var(--seal)', marginRight: '14px' }}>
                       제 {deck.squadNum} 군
@@ -242,8 +208,6 @@ export default function AutoSquadsPage() {
                     {deck.tier_name}
                   </h3>
 
-<<<<<<< HEAD
-=======
                   {/* 인연 효과 */}
                   {activeSynergies.length > 0 && (
                     <div style={{
@@ -264,7 +228,6 @@ export default function AutoSquadsPage() {
                     </div>
                   )}
 
->>>>>>> d4eb085 (전체 수정)
                   <div style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--paper-soft)', padding: '14px 20px', border: '1px solid rgba(184,147,90,0.35)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -301,11 +264,7 @@ export default function AutoSquadsPage() {
                               </div>
                               <div>
                                 <span style={{ fontSize: '1.3rem', fontWeight: '900', color: 'var(--ink-text)' }}>
-<<<<<<< HEAD
-                                  {gSetup.general_name} {gSetup.isSubstituted && <span style={{ fontSize: '0.8rem', color: 'var(--seal)', fontWeight: 'bold' }}>(대체)</span>}
-=======
                                   {gSetup.general_name}
->>>>>>> d4eb085 (전체 수정)
                                 </span>
                                 <div style={{ fontSize: '0.88rem', color: 'var(--paper-soft)', marginTop: '5px', fontWeight: 'bold', backgroundColor: 'var(--ink-text)', padding: '2px 7px', width: 'fit-content' }}>
                                   속성: {gSetup.stat_focus || '균형 투자'}
@@ -342,15 +301,15 @@ export default function AutoSquadsPage() {
                               <div style={{ fontSize: '0.85rem', color: 'var(--ink-text)', fontWeight: 'bold', marginBottom: '6px' }}>최적 병법 세팅</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                 {gSetup.arts_of_war?.unique && (
-  <div style={{ padding: '4px 8px', fontSize: '0.85rem', backgroundColor: 'rgba(184,147,90,0.18)', border: '2px solid var(--gold)', color: 'var(--seal-dark)', fontWeight: 'bold', width: 'fit-content' }}>
-    고유: {gSetup.arts_of_war.unique}
-  </div>
-)}
-<div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-  {gSetup.arts_of_war?.common?.map((warName, wIdx) => (
-    <span key={wIdx} className="recommend-tag" style={{ fontSize: '0.82rem' }}>{warName}</span>
-  ))}
-</div>
+                                  <div style={{ padding: '4px 8px', fontSize: '0.85rem', backgroundColor: 'rgba(184,147,90,0.18)', border: '2px solid var(--gold)', color: 'var(--seal-dark)', fontWeight: 'bold', width: 'fit-content' }}>
+                                    고유: {gSetup.arts_of_war.unique}
+                                  </div>
+                                )}
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {gSetup.arts_of_war?.common?.map((warName, wIdx) => (
+                                    <span key={wIdx} className="recommend-tag" style={{ fontSize: '0.82rem' }}>{warName}</span>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -368,8 +327,6 @@ export default function AutoSquadsPage() {
                     </div>
                   </div>
 
-<<<<<<< HEAD
-=======
                   {/* 출정서 낙관 — 장수 3명 도장 + 유저 닉네임 도장 */}
                   <div style={{
                     marginTop: '26px', paddingTop: '18px', borderTop: '1px dashed rgba(184,147,90,0.4)',
@@ -388,7 +345,6 @@ export default function AutoSquadsPage() {
                     )}
                   </div>
 
->>>>>>> d4eb085 (전체 수정)
                 </div>
               );
             })}
