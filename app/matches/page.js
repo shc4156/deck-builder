@@ -19,6 +19,9 @@ export default function MatchesPage() {
   const [deckFilter, setDeckFilter] = useState('all');
   const [glossaryTerm, setGlossaryTerm] = useState(null);
   const [myPinnedDecks, setMyPinnedDecks] = useState([]);
+  // 클릭된 장수 / 전법 팝업 관리를 위한 State
+const [selectedModalGeneral, setSelectedModalGeneral] = useState(null);
+const [selectedModalTactic, setSelectedModalTactic] = useState(null);
 
   useEffect(() => {
     async function fetchPinnedDecks() {
@@ -39,22 +42,45 @@ export default function MatchesPage() {
   }, []);
 
   // 📌 핀 토글
-  const togglePin = async (deckId) => {
+const togglePin = async (deckId) => {
+  // 1. 타입을 문자열로 통일
+  const targetId = String(deckId);
+
+  // 2. 현재 핀 목록에서도 문자열로 다루어 비교 (타입 차이로 인한 이슈 방지)
+  const isAlreadyPinned = myPinnedDecks.some(id => String(id) === targetId);
+
+  let newPins = [];
+  if (isAlreadyPinned) {
+    // 핀 해제: Target ID 제외
+    newPins = myPinnedDecks.filter(id => String(id) !== targetId);
+  } else {
+    // 핀 추가
+    newPins = [...myPinnedDecks, deckId];
+  }
+
+  // 3. UI 상태 먼저 즉시 업데이트 (사용자 반응성 향상)
+  setMyPinnedDecks(newPins);
+
+  // 4. Supabase DB 업데이트
+  try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    let newPins = [...myPinnedDecks];
-    if (newPins.includes(deckId)) {
-      newPins = newPins.filter(id => id !== deckId);
-    } else {
-      newPins.push(deckId);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ pinned_decks: newPins })
+      .eq('id', user.id);
+
+    if (error) {
+      console.error('핀 업데이트 실패:', error);
+      // 실패 시 원래 상태로 복구하고 싶다면 이전 값을 백업해두고 되돌릴 수 있습니다.
     }
+  } catch (err) {
+    console.error('핀 토글 중 오류 발생:', err);
+  }
+};
 
-    setMyPinnedDecks(newPins);
-    await supabase.from('profiles').update({ pinned_decks: newPins }).eq('id', user.id);
-  };
-
-  // 🛠️ 메인 전법과 서브/대체 전법을 명확히 분리하여 파싱
+  // 🛠️ 메인 전법과 서브 전법 파싱
   const parseDeckSetup = (deck) => {
     const heroes = [];
     
@@ -74,15 +100,14 @@ export default function MatchesPage() {
       const t2Sub = parseJson(deck[`hero${i}_tactic2_sub`]);
 
       const mainTactics = [t1Main, t2Main].filter(Boolean);
-      // DB에 명시된 서브/대체 전법들
       const dbSubTactics = [...t1Sub, ...t2Sub].filter(Boolean);
 
       heroes.push({
         general_name: name,
         stat_focus: deck[`hero${i}_stat`] || '속성 미정',
-        main_tactics: mainTactics,       // 메인 추천 전법
-        db_sub_tactics: dbSubTactics,   // DB 등록 대체 전법
-        added_tactics: mainTactics,     // 매칭 및 UI 메인 노출용
+        main_tactics: mainTactics.length > 0 ? mainTactics : ['전법 정보 없음'],
+        db_sub_tactics: dbSubTactics,
+        added_tactics: mainTactics,
         arts_of_war: {
           unique: deck[`hero${i}_unique_art_of_war`],
           common: parseJson(deck[`hero${i}_common_art_of_war`])
@@ -179,12 +204,7 @@ export default function MatchesPage() {
           <button onClick={() => setDeckFilter('all')} className={`classic-subtab ${deckFilter === 'all' ? 'active' : ''}`}>
             전체 전략표 ({tierDecks.length})
           </button>
-          <button onClick={() => setDeckFilter('tier')} className={`classic-subtab ${deckFilter === 'tier' ? 'active' : ''}`}>
-            종결 티어덱 ({tierDecks.filter(d => d.deck_type === 'tier').length})
-          </button>
-          <button onClick={() => setDeckFilter('start')} className={`classic-subtab ${deckFilter === 'start' ? 'active' : ''}`}>
-            개척 추천덱 ({tierDecks.filter(d => d.deck_type === 'start').length})
-          </button>
+          
         </div>
 
         <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
@@ -232,12 +252,7 @@ export default function MatchesPage() {
                 </button>
 
                 <div style={{ position: 'absolute', top: '24px', right: '28px', textAlign: 'right' }}>
-                  <span style={{
-                    padding: '5px 10px', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--paper-soft)',
-                    backgroundColor: isStartDeck ? 'var(--jade)' : 'var(--seal)', marginRight: '14px', verticalAlign: 'middle', letterSpacing: '1px'
-                  }}>
-                    {isStartDeck ? '개척추천' : '종결진격'}
-                  </span>
+              
                   <span style={{
                     fontSize: '2.1rem', fontWeight: '900', verticalAlign: 'middle', fontFamily: 'var(--font-display)',
                     color: totalPercent >= 85 ? 'var(--seal)' : totalPercent >= 60 ? 'var(--gold)' : 'var(--ink-text)'
@@ -287,90 +302,145 @@ export default function MatchesPage() {
                 </div>
 
                 {/* 장수 카드 3인 목록 */}
-                <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
-                  {parsedSetup.map((gSetup, idx) => {
-                    const isGenOwned = myGenNames.includes(gSetup.general_name);
-                    const matchedGeneralData = generals.find(g => g.name === gSetup.general_name);
-                    const dbImageUrl = matchedGeneralData?.image_url || '/images/generals/default.jpg';
+<div className="deck-general-grid" style={{ 
+  display: 'grid', 
+  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+  gap: '16px', 
+  marginBottom: '22px',
+  width: '100%',
+  boxSizing: 'border-box'
+}}>
+  {parsedSetup.map((gSetup, idx) => {
+    const isGenOwned = myGenNames.includes(gSetup.general_name);
+    const matchedGeneralData = (generals || []).find(g => g.name === gSetup.general_name);
+    const dbImageUrl = matchedGeneralData?.image_url || '/images/generals/default.jpg';
 
-                    return (
-                      <div
-                        key={idx}
-                        style={{
-                          border: isGenOwned ? '3px solid var(--seal)' : '1px dashed rgba(184,147,90,0.4)',
-                          padding: '16px',
-                          backgroundColor: isGenOwned ? 'var(--paper-soft)' : 'rgba(232,220,192,0.5)',
-                          filter: isGenOwned ? 'none' : 'grayscale(60%)',
-                          opacity: isGenOwned ? 1 : 0.75,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justify: 'space-between'
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '14px' }}>
-                            <div style={{ width: '55px', height: '50px', overflow: 'hidden', backgroundColor: 'var(--paper)', border: '2px solid var(--gold)', flexShrink: 0 }}>
-                              <img src={dbImageUrl} alt={gSetup.general_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = '/images/generals/default.jpg'; }} />
-                            </div>
-                            <div>
-                              <span style={{ fontSize: '1.3rem', fontWeight: '900', color: 'var(--ink-text)', letterSpacing: '0.5px' }}>
-                                {gSetup.general_name}
-                              </span>
-                              <div style={{ fontSize: '0.88rem', color: 'var(--paper-soft)', marginTop: '5px', fontWeight: 'bold', backgroundColor: 'var(--ink-text)', padding: '2px 7px', width: 'fit-content' }}>
-                                속성: {gSetup.stat_focus}
-                              </div>
-                            </div>
-                          </div>
+    return (
+      <div
+        key={idx}
+        style={{
+          border: isGenOwned ? '3px solid var(--seal)' : '1px dashed rgba(184,147,90,0.4)',
+          padding: '16px',
+          backgroundColor: isGenOwned ? 'var(--paper-soft)' : 'rgba(232,220,192,0.5)',
+          filter: isGenOwned ? 'none' : 'grayscale(60%)',
+          opacity: isGenOwned ? 1 : 0.75,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          width: '100%',
+          boxSizing: 'border-box',
+          overflow: 'hidden' // 내용물이 박스를 빠져나가지 않도록 방지
+        }}
+      >
+        <div>
+          {/* 장수 정보 프로필 */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '14px', width: '100%' }}>
+            <div style={{ width: '50px', height: '48px', overflow: 'hidden', backgroundColor: 'var(--paper)', border: '2px solid var(--gold)', flexShrink: 0 }}>
+              <img src={dbImageUrl} alt={gSetup.general_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = '/images/generals/default.jpg'; }} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--ink-text)', display: 'block', wordBreak: 'break-all' }}>
+                {gSetup.general_name}
+              </span>
+              <div style={{ fontSize: '0.8rem', color: 'var(--paper-soft)', marginTop: '4px', fontWeight: 'bold', backgroundColor: 'var(--ink-text)', padding: '2px 6px', width: 'fit-content', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                속성: {gSetup.stat_focus}
+              </div>
+            </div>
+          </div>
 
-                          {/* 추천 전법 영역 */}
-                          <div style={{ borderTop: '2px dashed rgba(184,147,90,0.4)', paddingTop: '12px', marginBottom: '14px' }}>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '8px', fontWeight: 'bold', letterSpacing: '0.5px' }}>추천 전법</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              {gSetup.added_tactics && gSetup.added_tactics.map((tName, tIdx) => {
-                                const isTacticOwnedInProfile = myTactNames.includes(tName);
-                                const matchedTacticData = tactics.find(t => t.name === tName);
-                                if (isTacticOwnedInProfile) dynamicUsedTactics.push(tName);
+          {/* 추천 전법 영역 */}
+          <div style={{ borderTop: '2px dashed rgba(184,147,90,0.4)', paddingTop: '12px', marginBottom: '14px', width: '100%', boxSizing: 'border-box' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '8px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+              권장 메인 전법
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+              {gSetup.main_tactics.map((tName, tIdx) => {
+                const isTacticOwnedInProfile = (myTactNames || []).includes(tName);
+                const matchedTacticData = (tactics || []).find(t => t.name === tName);
+                if (isTacticOwnedInProfile) dynamicUsedTactics.push(tName);
 
-                                return (
-                                  <div key={tIdx} style={{ marginBottom: '4px' }}>
-                                    <div style={{
-                                      padding: '7px 12px', fontSize: '0.95rem', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                      backgroundColor: isTacticOwnedInProfile ? 'rgba(63,93,84,0.12)' : 'rgba(43,35,24,0.05)',
-                                      color: isTacticOwnedInProfile ? 'var(--jade)' : 'rgba(43,35,24,0.55)',
-                                      border: isTacticOwnedInProfile ? '2px solid var(--jade)' : '2px solid rgba(43,35,24,0.2)'
-                                    }}>
-                                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        {matchedTacticData?.image_url && (
-                                          <img
-                                            src={matchedTacticData.image_url}
-                                            alt={tName}
-                                            style={{ width: '22px', height: '30px', objectFit: 'cover', border: '1px solid var(--gold)' }}
-                                          />
-                                        )}
-                                        {tName}
-                                      </span>
-                                      <span style={{ fontSize: '0.85rem' }}>{isTacticOwnedInProfile ? '✓' : '✗'}</span>
-                                    </div>
+                return (
+                  <div key={tIdx} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    {/* 보유 상태와 상관없이 DB 추천 전법 이름은 항상 노출 */}
+                    <div style={{
+                      padding: '7px 10px', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      backgroundColor: isTacticOwnedInProfile ? 'rgba(63,93,84,0.12)' : 'rgba(43,35,24,0.05)',
+                      color: isTacticOwnedInProfile ? 'var(--jade)' : 'rgba(43,35,24,0.65)',
+                      border: isTacticOwnedInProfile ? '2px solid var(--jade)' : '2px solid rgba(43,35,24,0.2)',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {matchedTacticData?.image_url && (
+                          <img
+                            src={matchedTacticData.image_url}
+                            alt={tName}
+                            style={{ width: '20px', height: '26px', objectFit: 'cover', border: '1px solid var(--gold)', flexShrink: 0 }}
+                          />
+                        )}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tName}</span>
+                      </span>
+                      <span style={{ fontSize: '0.85rem', flexShrink: 0, marginLeft: '6px' }}>{isTacticOwnedInProfile ? '✓' : '✗'}</span>
+                    </div>
 
-                                    {!isTacticOwnedInProfile && (
-                                      <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginTop: '6px', paddingLeft: '6px', fontWeight: 'bold', backgroundColor: 'rgba(166,50,42,0.08)', padding: '4px', borderLeft: '3px solid var(--seal)' }}>
-                                        {(() => {
-                                          const alts = findAlternativeTactics({
-                                            generalName: gSetup.general_name,
-                                            recommendedTacticName: tName,
-                                            tactics,
-                                            generals,
-                                            selectedTactics,
-                                            usedTacticsInDeck: dynamicUsedTactics,
-                                          });
-                                          if (alts.length > 0) {
-                                            dynamicUsedTactics.push(alts[0]);
-                                            return `대체 전법 제안: ${alts.join(', ')}`;
-                                          }
-                                          return '대체 가능 전법 자산 없음';
-                                        })()}
-                                      </div>
-                                    )}
+                                    {/* 메인 전법 미보유 시: DB 서브전법 + Generals.recommended_tactics + 유저 보유자산 종합 제안 */}
+{!isTacticOwnedInProfile && (
+  <div style={{ 
+    fontSize: '0.82rem', 
+    color: 'var(--seal-dark)', 
+    marginTop: '5px', 
+    padding: '6px', 
+    fontWeight: 'bold', 
+    backgroundColor: 'rgba(166,50,42,0.08)', 
+    borderLeft: '3px solid var(--seal)',
+    wordBreak: 'break-word',
+    width: '100%',
+    boxSizing: 'border-box'
+  }}>
+    {(() => {
+      // 1. tier_decks의 서브전법 중 유저가 보유한 전법
+      const ownedDbSub = (gSetup.db_sub_tactics || []).filter(st => myTactNames.includes(st) && !dynamicUsedTactics.includes(st));
+
+      // 2. Generals 테이블의 recommended_tactics 데이터 가져오기
+      let generalRecTactics = [];
+      if (matchedGeneralData?.recommended_tactics) {
+        const rawRecs = matchedGeneralData.recommended_tactics;
+        if (Array.isArray(rawRecs)) generalRecTactics = rawRecs;
+        else {
+          try { generalRecTactics = JSON.parse(rawRecs); } catch { generalRecTactics = []; }
+        }
+      }
+      // 유저가 보유 중인 해당 장수 전용 추천 전법 추출
+      const ownedGeneralRecs = generalRecTactics.filter(rt => myTactNames.includes(rt) && !dynamicUsedTactics.includes(rt));
+
+      // 3. 대체 전법 탐색 엔진(findAlternativeTactics) 알고리즘 결과
+      const algoAlts = findAlternativeTactics({
+        generalName: gSetup.general_name,
+        recommendedTacticName: tName,
+        tactics,
+        generals,
+        selectedTactics,
+        usedTacticsInDeck: dynamicUsedTactics,
+      });
+
+      // 1, 2, 3의 결과를 중복 없이 순서대로 병합 (우선순위: 덱 서브 전법 > 장수 보유 추천 전법 > 알고리즘 추천)
+      const combinedAlts = Array.from(new Set([...ownedDbSub, ...ownedGeneralRecs, ...algoAlts]));
+
+      if (combinedAlts.length > 0) {
+        dynamicUsedTactics.push(combinedAlts[0]);
+        return `🔄 대체 전법: ${combinedAlts.join(', ')}`;
+      }
+      
+      // 유저가 보유한 대체 전법이 하나도 없는 경우: 후보군 안내
+      const allSubCandidates = Array.from(new Set([...(gSetup.db_sub_tactics || []), ...generalRecTactics]));
+      if (allSubCandidates.length > 0) {
+        return `💡 권장 대체 옵션: ${allSubCandidates.slice(0, 3).join(', ')} (미보유)`;
+      }
+
+      return '대체 가능 전법 없음';
+    })()}
+  </div>
+)}
                                   </div>
                                 );
                               })}
