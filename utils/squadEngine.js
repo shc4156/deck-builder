@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { SYNERGY_MASTER } from '../data/synergies';
 import { COMMON_ARTS_OF_WAR, getArtsCategoryForGeneral } from '../data/artsOfWar';
 import { findAlternativeTactics } from '../data/tacticAlternatives';
@@ -427,4 +428,237 @@ export function buildOptimalSquads({ tierDecks, generals, tactics, myGenNames, m
   }
 
   return squads;
+=======
+import { getFallbackTacticsForGeneral } from './tacticFallback';
+
+/**
+ * 1-5군 자동 추천 메인 엔진
+ */
+export function generateFullSquads({
+  tierDecks = [],
+  ownedGeneralNames = [],
+  ownedTacticNames = [],
+  generalsData = [],
+  synergiesData = [],
+  bondsData = [],
+  allTactics = []
+}) {
+  const availableGenerals = new Set(ownedGeneralNames);
+  const availableTactics = new Set(ownedTacticNames);
+  const finalSquads = [];
+
+  // --------------------------------------------------
+  // 1단계: 티어덱 우선 매칭 (최대 5개)
+  // --------------------------------------------------
+  const matchedTierDecks = matchTierDecks(tierDecks, Array.from(availableGenerals), allTactics);
+
+  matchedTierDecks.forEach(squad => {
+    if (finalSquads.length >= 5) return;
+
+    // 사용된 장수 차감
+    squad.deck_setup.forEach(hero => {
+      availableGenerals.delete(hero.general_name);
+      hero.tactics.forEach(t => {
+        if (t.main) availableTactics.delete(t.main);
+      });
+    });
+
+    squad.squadNum = finalSquads.length + 1;
+    squad.source = 'tier_deck';
+    finalSquads.push(squad);
+  });
+
+  // --------------------------------------------------
+  // 2단계: 남은 자산 기반 커스텀 스쿼드 생성
+  // --------------------------------------------------
+  let remainingGenerals = Array.from(availableGenerals);
+
+  while (finalSquads.length < 5 && remainingGenerals.length >= 3) {
+    const bestCombination = findBestTriadCombination(
+      remainingGenerals,
+      generalsData,
+      synergiesData,
+      bondsData,
+      allTactics,
+      Array.from(availableTactics)
+    );
+
+    if (!bestCombination) break;
+
+    // 사용된 장수 차감
+    bestCombination.members.forEach(name => {
+      availableGenerals.delete(name);
+    });
+    remainingGenerals = Array.from(availableGenerals);
+
+    finalSquads.push({
+      id: `custom-${Date.now()}-${finalSquads.length + 1}`,
+      tier_name: bestCombination.deckName,
+      description: '보유 자산 기반 최적 시너지 커스텀 덱',
+      squadNum: finalSquads.length + 1,
+      formation_grid: bestCombination.recommendedFormation,
+      deck_setup: bestCombination.setup,
+      source: 'custom_builder',
+      score: bestCombination.score
+    });
+  }
+
+  return finalSquads;
+}
+
+/**
+ * 티어덱 매칭 로직
+ */
+function matchTierDecks(tierDecks, ownedGenerals, allTactics) {
+  const matched = [];
+
+  for (const deck of tierDecks) {
+    const heroNames = [deck.hero1_name, deck.hero2_name, deck.hero3_name].filter(Boolean);
+    
+    // 장수 3명이 모두 보유 목록에 있는지 확인
+    const canBuild = heroNames.every(name => ownedGenerals.includes(name));
+
+    if (canBuild) {
+      const normalized = normalizeTierDeck(deck, allTactics);
+      matched.push(normalized);
+    }
+  }
+
+  return matched;
+}
+
+/**
+ * 티어덱 데이터 정규화 및 Sub 전법 보완
+ */
+function normalizeTierDeck(deck, allTactics) {
+  const heroes = [1, 2, 3].map(num => {
+    const name = deck[`hero${num}_name`];
+    if (!name) return null;
+
+    const t1Main = deck[`hero${num}_tactic1_main`];
+    let t1Sub = parseSubTactics(deck[`hero${num}_tactic1_sub`]);
+    // Sub 전법이 없으면 추천 전법 상위 3개 채움
+    if (t1Sub.length === 0 && t1Main) {
+      t1Sub = getFallbackTacticsForGeneral(name, t1Main, allTactics);
+    }
+
+    const t2Main = deck[`hero${num}_tactic2_main`];
+    let t2Sub = parseSubTactics(deck[`hero${num}_tactic2_sub`]);
+    if (t2Sub.length === 0 && t2Main) {
+      t2Sub = getFallbackTacticsForGeneral(name, t2Main, allTactics);
+    }
+
+    return {
+      general_name: name,
+      stat_focus: deck[`hero${num}_stat`] || '',
+      tactics: [
+        { main: t1Main, sub: t1Sub },
+        { main: t2Main, sub: t2Sub }
+      ].filter(t => t.main),
+      arts_of_war: {
+        unique: deck[`hero${num}_unique_art_of_war`] || null,
+        common: parseJsonArray(deck[`hero${num}_common_art_of_war`])
+      },
+      equipment_options: parseJsonArray(deck[`hero${num}_equip`])
+    };
+  }).filter(Boolean);
+
+  return {
+    ...deck,
+    tier_name: deck.deck_name,
+    deck_setup: heroes,
+    formation_grid: deck.formation ? deck.formation.split(',').map(Number) : [0, 1, 0, 0, 1, 1]
+  };
+}
+
+/**
+ * 3무장 조합 탐색
+ */
+function findBestTriadCombination(generalsList, generalsData, synergiesData, bondsData, allTactics, availableTactics) {
+  let bestCandidate = null;
+  let maxScore = -999;
+
+  for (let i = 0; i < generalsList.length; i++) {
+    for (let j = i + 1; j < generalsList.length; j++) {
+      for (let k = j + 1; k < generalsList.length; k++) {
+        const trio = [generalsList[i], generalsList[j], generalsList[k]];
+        const score = calculateTrioScore(trio, generalsData, synergiesData, bondsData);
+
+        if (score > maxScore) {
+          maxScore = score;
+          
+          const trioInfo = trio.map(name => 
+            generalsData.find(g => g.general_name === name) || { general_name: name, category: 'attack_carry' }
+          );
+
+          bestCandidate = {
+            members: trio,
+            score: maxScore,
+            deckName: `${trio[0]}·${trio[1]}·${trio[2]} 덱`,
+            recommendedFormation: [0, 1, 0, 0, 1, 1],
+            setup: trioInfo.map(g => {
+              // 해당 장수의 추천 전법 추출
+              const recommendedSubs = getFallbackTacticsForGeneral(g.general_name, '', allTactics);
+              return {
+                general_name: g.general_name,
+                stat_focus: g.category === 'attack_carry' ? '무력' : '지력',
+                tactics: [
+                  { main: recommendedSubs[0] || '자유 선택', sub: recommendedSubs.slice(1, 4) }
+                ],
+                arts_of_war: { unique: null, common: [] },
+                equipment_options: ['지력', '통솔']
+              };
+            })
+          };
+        }
+      }
+    }
+  }
+
+  return bestCandidate;
+}
+
+function calculateTrioScore(trioNames, generalsData, synergiesData, bondsData) {
+  let score = 0;
+
+  const categories = trioNames.map(name => {
+    const info = generalsData.find(g => g.general_name === name);
+    return info ? info.category : 'unknown';
+  });
+
+  const hasCarry = categories.some(c => c === 'attack_carry');
+  const hasSupport = categories.some(c => typeof c === 'string' && c.startsWith('support_'));
+  if (hasCarry && hasSupport) score += 30;
+
+  // 연결 시너지 점수
+  synergiesData.forEach(syn => {
+    if (trioNames.includes(syn.leader_name) && trioNames.includes(syn.follower_name)) {
+      score += (syn.score || 3) * 5;
+    }
+  });
+
+  // 인연 점수
+  bondsData.forEach(bond => {
+    const members = parseJsonArray(bond.members);
+    const matchCount = members.filter(m => trioNames.includes(m)).length;
+    if (matchCount >= bond.req_count) {
+      score += 25;
+    }
+  });
+
+  return score;
+}
+
+// 헬퍼 함수들
+function parseSubTactics(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  try { return JSON.parse(val); } catch (e) { return []; }
+}
+
+function parseJsonArray(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  try { return JSON.parse(val); } catch (e) { return []; }
+>>>>>>> d4eb085 (전체 수정)
 }

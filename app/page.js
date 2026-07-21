@@ -20,6 +20,7 @@ export default function MyDeckPage() {
 
   const [activeTab, setActiveTab] = useState('my-assets');
 
+<<<<<<< HEAD
   // 다른 페이지(예: 티어덱 매칭)에서 ?tab=dictionary 같은 쿼리를 달고 들어왔을 때
   // 해당 탭으로 바로 열리도록 반영 (useSearchParams는 Suspense가 필요해서 window로 직접 처리)
   useEffect(() => {
@@ -29,6 +30,15 @@ export default function MyDeckPage() {
       setActiveTab(tabFromUrl);
     }
   }, []);
+=======
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const tabFromUrl = params.get('tab');
+  if (tabFromUrl && ['my-assets', 'dictionary', 'deck-analyzer'].includes(tabFromUrl)) {
+    setActiveTab(tabFromUrl);
+  }
+}, []);
+>>>>>>> d4eb085 (전체 수정)
 
   
 
@@ -171,6 +181,10 @@ export default function MyDeckPage() {
               />
             )}
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> d4eb085 (전체 수정)
           </>
         )}
       </div>

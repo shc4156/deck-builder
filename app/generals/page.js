@@ -73,4 +73,8 @@ export default function GeneralsPage() {
       </div>
     </PageLayout>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> d4eb085 (전체 수정)
