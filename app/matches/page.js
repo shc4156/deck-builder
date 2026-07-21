@@ -1,4 +1,3 @@
-// app/matches/page.js
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -9,17 +8,17 @@ import GlossaryModal from '../components/GlossaryModal';
 import { getActiveSynergiesFromSetup, matchFormationInfo } from '../../data/synergies';
 import { findAlternativeTactics } from '../../data/tacticAlternatives';
 import { useDeckAssets } from '../../hooks/useDeckAssets';
-import { supabase } from '../lib/supabaseClient'; // Supabase 임포트 확인
+import { supabase } from '../lib/supabaseClient';
 
 export default function MatchesPage() {
   const {
-    generals, tactics, tierDecks, isLoading,
-    selectedGenerals, selectedTactics
+    generals = [], tactics = [], tierDecks = [], isLoading,
+    selectedGenerals = [], selectedTactics = []
   } = useDeckAssets();
 
   const [deckFilter, setDeckFilter] = useState('all');
   const [glossaryTerm, setGlossaryTerm] = useState(null);
-  const [myPinnedDecks, setMyPinnedDecks] = useState([]); 
+  const [myPinnedDecks, setMyPinnedDecks] = useState([]);
 
   useEffect(() => {
     async function fetchPinnedDecks() {
@@ -39,17 +38,12 @@ export default function MatchesPage() {
     fetchPinnedDecks();
   }, []);
 
-  // 대체 전법 탐색은 data/tacticAlternatives.js의 findAlternativeTactics로 공용화됨.
-  // (utils/squadEngine.js의 1-5군 자동편성에서도 동일 함수를 사용 — 매칭 페이지가
-  // 보여주는 "대체 전법 제안"과 실제 스쿼드에 배정되는 전법이 항상 같은 결과를 내도록 통일)
-
-  // 핀 토글 및 즉각 업데이트
+  // 📌 핀 토글
   const togglePin = async (deckId) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     let newPins = [...myPinnedDecks];
-    
     if (newPins.includes(deckId)) {
       newPins = newPins.filter(id => id !== deckId);
     } else {
@@ -60,27 +54,69 @@ export default function MatchesPage() {
     await supabase.from('profiles').update({ pinned_decks: newPins }).eq('id', user.id);
   };
 
-  // 매칭률 계산
+  // 🛠️ 수파베이스 신규 데이터 구조(hero1, hero2, hero3)를 기존 deck_setup 객체 형태로 파싱
+  const parseDeckSetup = (deck) => {
+    const heroes = [];
+    
+    // 안전한 JSON 파싱 헬퍼
+    const parseJson = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      try { return JSON.parse(val); } catch { return []; }
+    };
+
+    for (let i = 1; i <= 3; i++) {
+      const name = deck[`hero${i}_name`]?.trim();
+      if (!name) continue;
+
+      const t1Main = deck[`hero${i}_tactic1_main`];
+      const t1Sub = parseJson(deck[`hero${i}_tactic1_sub`]);
+      const t2Main = deck[`hero${i}_tactic2_main`];
+      const t2Sub = parseJson(deck[`hero${i}_tactic2_sub`]);
+
+      // 메인 전법 + 서브 전법을 합쳐서 추천 전법 배열 생성
+      const mainTactics = [t1Main, t2Main].filter(Boolean);
+      const subTactics = [...t1Sub, ...t2Sub].filter(Boolean);
+      const addedTactics = [...mainTactics, ...subTactics];
+
+      heroes.push({
+        general_name: name,
+        stat_focus: deck[`hero${i}_stat`] || '속성 미정',
+        added_tactics: addedTactics,
+        main_tactics: mainTactics,
+        arts_of_war: {
+          unique: deck[`hero${i}_unique_art_of_war`],
+          common: parseJson(deck[`hero${i}_common_art_of_war`])
+        },
+        equipment_options: parseJson(deck[`hero${i}_equip`])
+      });
+    }
+    return heroes;
+  };
+
+  // 📊 매칭률 계산
   const calculateMatch = (deck) => {
-    if (!deck.deck_setup || !Array.isArray(deck.deck_setup)) {
-      return { totalPercent: 0, matchedGenCount: 0, matchedTactCount: 0, deckGens: [], deckTactics: [], myGenNames: [], myTactNames: [] };
+    const deckSetup = parseDeckSetup(deck);
+    if (deckSetup.length === 0) {
+      return { totalPercent: 0, matchedGenCount: 0, matchedTactCount: 0, deckGens: [], deckTactics: [], myGenNames: [], myTactNames: [], parsedSetup: [] };
     }
 
-    const deckGens = deck.deck_setup.map(g => g.general_name);
-    const deckTactics = deck.deck_setup.flatMap(g => g.added_tactics || []);
+    const deckGens = deckSetup.map(g => g.general_name);
+    // 주요 매칭 대상 전법 (메인 전법 위주로 산정)
+    const deckTactics = deckSetup.flatMap(g => g.main_tactics.length > 0 ? g.main_tactics : g.added_tactics);
 
-    const myGenNames = generals
-      .filter(g => selectedGenerals.includes(g.id))
+    const myGenNames = (generals || [])
+      .filter(g => (selectedGenerals || []).includes(g.id))
       .map(g => g.name);
     const matchedGenCount = deckGens.filter(name => myGenNames.includes(name)).length;
 
-    const myTactNames = tactics
-      .filter(t => selectedTactics.includes(t.id))
+    const myTactNames = (tactics || [])
+      .filter(t => (selectedTactics || []).includes(t.id))
       .map(t => t.name);
     const matchedTactCount = deckTactics.filter(name => myTactNames.includes(name)).length;
 
-    const genScore = (matchedGenCount / 3) * 50;
-    const tactScore = deckTactics.length > 0 ? (matchedTactCount / deckTactics.length) * 50 : 0;
+    const genScore = (matchedGenCount / 3) * 60; // 장수 보유 점수 60점
+    const tactScore = deckTactics.length > 0 ? (matchedTactCount / deckTactics.length) * 40 : 0; // 전법 보유 점수 40점
     const totalPercent = Math.round(genScore + tactScore);
 
     return {
@@ -90,12 +126,13 @@ export default function MatchesPage() {
       deckGens,
       deckTactics,
       myGenNames,
-      myTactNames
+      myTactNames,
+      parsedSetup: deckSetup
     };
   };
 
-  // ★ 핵심 정렬 변경: 핀 찍은 덱(Pinned)은 매칭 점수와 관계없이 0순위로 맨 위에 정렬
-  const filteredDecks = tierDecks
+  // 📌 핀 고정 우선 정렬
+  const filteredDecks = (tierDecks || [])
     .filter(deck => {
       if (deckFilter === 'all') return true;
       return deck.deck_type === deckFilter;
@@ -108,11 +145,9 @@ export default function MatchesPage() {
       const aPinned = myPinnedDecks.includes(a.id);
       const bPinned = myPinnedDecks.includes(b.id);
 
-      // 1. 둘 다 핀 상태가 다를 때: 핀된 덱을 무조건 최상단으로 정렬
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
 
-      // 2. 둘 다 핀 상태가 같을 때(둘 다 핀이거나, 둘 다 아니거나): 기존 매칭률 점수 순으로 정렬
       return b.matchInfo.totalPercent - a.matchInfo.totalPercent;
     });
 
@@ -130,12 +165,11 @@ export default function MatchesPage() {
     <PageLayout>
       <div style={{ padding: '25px', minHeight: '100vh' }}>
         <nav className="classic-tabbar" style={{ marginBottom: '35px' }}>
-  <Link href="/?tab=my-assets" className="classic-tab">나의 보유 현황</Link>
-  <Link href="/?tab=dictionary" className="classic-tab">통합 도감</Link>
-  <span className="classic-tab active">티어덱 매칭</span>
-  {/* ★ /?tab=auto-squad 에서 /squads 로 경로 직접 수정 */}
-  <Link href="/squads" className="classic-tab">1-5군 추천 편성</Link>
-</nav>
+          <Link href="/?tab=my-assets" className="classic-tab">나의 보유 현황</Link>
+          <Link href="/?tab=dictionary" className="classic-tab">통합 도감</Link>
+          <span className="classic-tab active">티어덱 매칭</span>
+          <Link href="/squads" className="classic-tab">1-5군 추천 편성</Link>
+        </nav>
 
         <h1 className="classic-heading text-3xl font-bold mb-2">티어덱 &amp; 개척추천 매칭</h1>
         <p style={{ color: 'var(--gold-soft)', marginBottom: '30px', fontSize: '1.05rem', fontWeight: 500 }}>
@@ -156,12 +190,15 @@ export default function MatchesPage() {
 
         <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
           {filteredDecks.map(deck => {
-            const { totalPercent, myGenNames, myTactNames } = deck.matchInfo;
+            const { totalPercent, myGenNames, myTactNames, parsedSetup } = deck.matchInfo;
             const isStartDeck = deck.deck_type === 'start';
-            const formationInfo = matchFormationInfo(deck.formation_grid);
+            
+            // "0,1,1,1,0,0" 형태의 문자열을 숫자 배열로 파싱
+            const formationGrid = deck.formation ? deck.formation.split(',').map(Number) : [];
+            const formationInfo = matchFormationInfo(formationGrid);
             const isPinned = myPinnedDecks.includes(deck.id);
 
-            const staticOwnedTactics = deck.deck_setup.flatMap(g => {
+            const staticOwnedTactics = parsedSetup.flatMap(g => {
               if (!g.added_tactics) return [];
               return g.added_tactics.filter(tName => myTactNames.includes(tName));
             });
@@ -175,7 +212,6 @@ export default function MatchesPage() {
                 style={{ 
                   padding: '28px', 
                   position: 'relative',
-                  // ★ 핀 고정된 카드는 연한 황금빛 배경 테두리로 감싸 시각적 만족도를 높임
                   border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)',
                   boxShadow: isPinned ? '0 0 10px rgba(184,147,90,0.2)' : 'none'
                 }}
@@ -211,13 +247,19 @@ export default function MatchesPage() {
                   </span>
                 </div>
 
-                {/* 타이틀 왼쪽 패딩을 주어 핀 아이콘과 안 겹치게 조정 */}
-                <h3 className="deck-title classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '14px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%', paddingLeft: '35px' }}>
-                  {deck.tier_name}
+                {/* 덱 이름 & 설명 */}
+                <h3 className="deck-title classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '6px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%', paddingLeft: '35px' }}>
+                  {deck.deck_name}
                 </h3>
+                {deck.description && (
+                  <p style={{ color: 'var(--seal-dark)', fontSize: '0.95rem', marginBottom: '14px', paddingLeft: '35px', fontWeight: 'bold' }}>
+                    {deck.description}
+                  </p>
+                )}
                 
+                {/* 인연 정보 */}
                 <div style={{ margin: '15px 0', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {getActiveSynergiesFromSetup(deck.deck_setup).map((s, idx) => (
+                  {getActiveSynergiesFromSetup(parsedSetup).map((s, idx) => (
                     <span key={idx} style={{
                       padding: '4px 10px',
                       backgroundColor: 'rgba(166, 50, 42, 0.08)',
@@ -231,6 +273,7 @@ export default function MatchesPage() {
                   ))}
                 </div>
 
+                {/* 진형 정보 */}
                 <div style={{ marginBottom: '25px', fontSize: '1.05rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--paper-soft)', padding: '14px 20px', border: '1px solid rgba(184,147,90,0.35)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -241,11 +284,12 @@ export default function MatchesPage() {
                       군진효과: {formationInfo.effect}
                     </div>
                   </div>
-                  <FormationGridVisual gridData={deck.formation_grid} />
+                  <FormationGridVisual gridData={formationGrid} />
                 </div>
 
+                {/* 장수 카드 3인 목록 */}
                 <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
-                  {deck.deck_setup.map((gSetup, idx) => {
+                  {parsedSetup.map((gSetup, idx) => {
                     const isGenOwned = myGenNames.includes(gSetup.general_name);
                     const matchedGeneralData = generals.find(g => g.name === gSetup.general_name);
                     const dbImageUrl = matchedGeneralData?.image_url || '/images/generals/default.jpg';
@@ -261,7 +305,7 @@ export default function MatchesPage() {
                           opacity: isGenOwned ? 1 : 0.75,
                           display: 'flex',
                           flexDirection: 'column',
-                          justifyContent: 'space-between'
+                          justify: 'space-between'
                         }}
                       >
                         <div>
@@ -279,6 +323,7 @@ export default function MatchesPage() {
                             </div>
                           </div>
 
+                          {/* 추천 전법 영역 */}
                           <div style={{ borderTop: '2px dashed rgba(184,147,90,0.4)', paddingTop: '12px', marginBottom: '14px' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '8px', fontWeight: 'bold', letterSpacing: '0.5px' }}>추천 전법</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -333,6 +378,7 @@ export default function MatchesPage() {
                             </div>
                           </div>
 
+                          {/* 권장 병법 영역 */}
                           {!isStartDeck && gSetup.arts_of_war && (
                             <div style={{ borderTop: '2px dashed rgba(184,147,90,0.4)', paddingTop: '10px', marginBottom: '4px' }}>
                               <div style={{ fontSize: '0.85rem', color: 'var(--ink-text)', fontWeight: 'bold', marginBottom: '6px' }}>권장 병법</div>
@@ -360,6 +406,7 @@ export default function MatchesPage() {
                   })}
                 </div>
 
+                {/* 장비 추천 속성 가이드 */}
                 <div style={{
                   borderTop: '2px solid var(--gold)',
                   fontSize: '0.95rem',
@@ -371,9 +418,9 @@ export default function MatchesPage() {
                     장비 추천 속성 가이드
                   </span>
                   <div style={{ color: 'var(--ink-text)', lineHeight: '1.5', display: 'flex', flexWrap: 'wrap', gap: '20px', fontWeight: 'bold' }}>
-                    {deck.deck_setup.map((g, i) => (
+                    {parsedSetup.map((g, i) => (
                       <div key={i}>
-                        <span style={{ color: 'var(--seal-dark)' }}>{g.general_name}</span>: {g.equipment_options ? g.equipment_options.join(' / ') : '속성 조율 중'}
+                        <span style={{ color: 'var(--seal-dark)' }}>{g.general_name}</span>: {g.equipment_options && g.equipment_options.length > 0 ? g.equipment_options.join(' / ') : '속성 조율 중'}
                       </div>
                     ))}
                   </div>
