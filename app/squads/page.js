@@ -1,3 +1,4 @@
+// app/squads/page.js
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -9,39 +10,6 @@ import { getActiveSynergiesFromSetup, matchFormationInfo } from '../../data/syne
 import { useDeckAssets } from '../../hooks/useDeckAssets';
 import { supabase } from '../lib/supabaseClient';
 import { buildOptimalSquads } from '../../utils/squadEngine';
-
-// 도장(낙관) 하나를 그려주는 작은 컴포넌트. 손도장 느낌을 위해 개체마다
-// 살짝 다른 각도로 회전시킨다.
-function SealStamp({ label, tone = 'general', rotate = 0 }) {
-  const isUser = tone === 'user';
-  return (
-    <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: isUser ? '76px' : '58px',
-        height: isUser ? '76px' : '58px',
-        borderRadius: '6px',
-        border: `2px solid ${isUser ? 'var(--seal)' : 'var(--seal-dark)'}`,
-        color: isUser ? 'var(--seal)' : 'var(--seal-dark)',
-        backgroundColor: 'rgba(178, 34, 34, 0.06)',
-        fontFamily: "'Noto Serif KR', serif",
-        fontWeight: 900,
-        fontSize: isUser ? '1.05rem' : '0.85rem',
-        letterSpacing: '1px',
-        writingMode: 'vertical-rl',
-        textOrientation: 'upright',
-        transform: `rotate(${rotate}deg)`,
-        opacity: 0.9,
-        boxShadow: '0 0 0 1px rgba(178,34,34,0.15) inset',
-        userSelect: 'none',
-      }}
-    >
-      {label}
-    </div>
-  );
-}
 
 export default function AutoSquadsPage() {
   const COMING_SOON = true; // 배포 전 이 값만 false로 바꾸면 원래 기능 복구
@@ -101,9 +69,7 @@ export default function AutoSquadsPage() {
     setEditingSlot(null); // 편집 완료 후 모달 닫기
   };
 
-  // 티어덱 고정 대신 "반드시 포함할 장수" 목록으로 전환
-  const [myPinnedGenerals, setMyPinnedGenerals] = useState([]);
-  const [myNickname, setMyNickname] = useState('');
+  const [myPinnedDecks, setMyPinnedDecks] = useState([]);
 
   const myGenNames = useMemo(() => 
     generals.filter(g => selectedGenerals.includes(g.id)).map(g => g.name.trim()),
@@ -114,17 +80,14 @@ export default function AutoSquadsPage() {
   [tactics, selectedTactics]);
 
   useEffect(() => {
-    async function fetchProfile() {
+    async function fetchPinnedDecks() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // pinned_generals: 반드시 포함할 장수 이름 배열 (jsonb) — 컬럼이 없다면 새로 추가 필요
-        // nickname: 출정서 낙관에 찍을 유저 닉네임 — 컬럼명이 다르면 여기만 바꾸면 됨
-        const { data } = await supabase.from('profiles').select('pinned_generals, nickname').eq('id', user.id).single();
-        if (data?.pinned_generals) setMyPinnedGenerals(data.pinned_generals);
-        if (data?.nickname) setMyNickname(data.nickname);
+        const { data } = await supabase.from('profiles').select('pinned_decks').eq('id', user.id).single();
+        if (data?.pinned_decks) setMyPinnedDecks(data.pinned_decks);
       }
     }
-    fetchProfile();
+    fetchPinnedDecks();
   }, []);
 
   // 외부 엔진을 통해 1-5군 생성 위임
@@ -134,11 +97,11 @@ export default function AutoSquadsPage() {
 
     const generatedSquads = buildOptimalSquads({
       tierDecks, generals, tactics, myGenNames, myTactNames, 
-      pinnedGeneralNames: myPinnedGenerals, selectedTactics
+      pinnedDeckIds: myPinnedDecks, selectedTactics
     });
 
     setSquads(generatedSquads);
-  }, [isLoading, tierDecks, generals, tactics, myGenNames, myTactNames, myPinnedGenerals, selectedTactics]);
+  }, [isLoading, tierDecks, generals, tactics, myGenNames, myTactNames, myPinnedDecks, selectedTactics]);
 
   if (isLoading) {
     return (
@@ -173,30 +136,10 @@ export default function AutoSquadsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
             {squads.map(deck => {
               const formationInfo = matchFormationInfo(deck.formation_grid);
-              const isPinned = deck.deck_setup.some(g => myPinnedGenerals.includes(g.general_name));
-              const activeSynergies = getActiveSynergiesFromSetup
-                ? (getActiveSynergiesFromSetup(deck.deck_setup) || [])
-                : [];
+              const isPinned = myPinnedDecks.includes(deck.id);
 
               return (
-                <div
-                  key={`${deck.id}-${deck.squadNum}`}
-                  className="scroll-panel"
-                  style={{
-                    position: 'relative',
-                    padding: '32px',
-                    border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)',
-                    backgroundImage:
-                      'repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(184,147,90,0.06) 28px)',
-                  }}
-                >
-                  {/* 칙서 상단 장식 */}
-                  <div style={{ textAlign: 'center', marginBottom: '18px' }}>
-                    <div style={{ fontSize: '0.85rem', letterSpacing: '6px', color: 'var(--gold-soft)', fontWeight: 700 }}>
-                      ❖ 출 정 교 지 ❖
-                    </div>
-                  </div>
-
+                <div key={`${deck.id}-${deck.squadNum}`} className="scroll-panel" style={{ padding: '28px', border: isPinned ? '2px solid var(--gold)' : '1px solid rgba(184,147,90,0.25)' }}>
                   <div style={{ position: 'absolute', top: '24px', right: '28px', textAlign: 'right' }}>
                     <span style={{ padding: '5px 12px', fontSize: '1rem', fontWeight: 'bold', color: 'var(--paper-soft)', backgroundColor: 'var(--seal)', marginRight: '14px' }}>
                       제 {deck.squadNum} 군
@@ -207,26 +150,6 @@ export default function AutoSquadsPage() {
                   <h3 className="classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '14px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%' }}>
                     {deck.tier_name}
                   </h3>
-
-                  {/* 인연 효과 */}
-                  {activeSynergies.length > 0 && (
-                    <div style={{
-                      marginBottom: '18px', padding: '12px 18px',
-                      backgroundColor: 'rgba(63,93,84,0.08)', border: '1px dashed var(--jade)',
-                    }}>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--jade)', fontWeight: 'bold', marginBottom: '6px' }}>
-                        발동 인연 효과
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {activeSynergies.map((syn, sIdx) => (
-                          <div key={sIdx} style={{ fontSize: '0.9rem', color: 'var(--ink-text)' }}>
-                            <span style={{ fontWeight: 'bold', color: 'var(--seal-dark)' }}>{syn.name}</span>
-                            {syn.effect && <span> — {syn.effect}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   <div style={{ marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--paper-soft)', padding: '14px 20px', border: '1px solid rgba(184,147,90,0.35)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -264,7 +187,7 @@ export default function AutoSquadsPage() {
                               </div>
                               <div>
                                 <span style={{ fontSize: '1.3rem', fontWeight: '900', color: 'var(--ink-text)' }}>
-                                  {gSetup.general_name}
+                                  {gSetup.general_name} {gSetup.isSubstituted && <span style={{ fontSize: '0.8rem', color: 'var(--seal)', fontWeight: 'bold' }}>(대체)</span>}
                                 </span>
                                 <div style={{ fontSize: '0.88rem', color: 'var(--paper-soft)', marginTop: '5px', fontWeight: 'bold', backgroundColor: 'var(--ink-text)', padding: '2px 7px', width: 'fit-content' }}>
                                   속성: {gSetup.stat_focus || '균형 투자'}
@@ -301,15 +224,15 @@ export default function AutoSquadsPage() {
                               <div style={{ fontSize: '0.85rem', color: 'var(--ink-text)', fontWeight: 'bold', marginBottom: '6px' }}>최적 병법 세팅</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                 {gSetup.arts_of_war?.unique && (
-                                  <div style={{ padding: '4px 8px', fontSize: '0.85rem', backgroundColor: 'rgba(184,147,90,0.18)', border: '2px solid var(--gold)', color: 'var(--seal-dark)', fontWeight: 'bold', width: 'fit-content' }}>
-                                    고유: {gSetup.arts_of_war.unique}
-                                  </div>
-                                )}
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                  {gSetup.arts_of_war?.common?.map((warName, wIdx) => (
-                                    <span key={wIdx} className="recommend-tag" style={{ fontSize: '0.82rem' }}>{warName}</span>
-                                  ))}
-                                </div>
+  <div style={{ padding: '4px 8px', fontSize: '0.85rem', backgroundColor: 'rgba(184,147,90,0.18)', border: '2px solid var(--gold)', color: 'var(--seal-dark)', fontWeight: 'bold', width: 'fit-content' }}>
+    고유: {gSetup.arts_of_war.unique}
+  </div>
+)}
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+  {gSetup.arts_of_war?.common?.map((warName, wIdx) => (
+    <span key={wIdx} className="recommend-tag" style={{ fontSize: '0.82rem' }}>{warName}</span>
+  ))}
+</div>
                               </div>
                             </div>
                           </div>
@@ -325,24 +248,6 @@ export default function AutoSquadsPage() {
                         <div key={i}><span style={{ color: 'var(--seal-dark)' }}>{g.general_name}</span>: {g.equipment_options ? g.equipment_options.join(' / ') : '속성 조율 중'}</div>
                       ))}
                     </div>
-                  </div>
-
-                  {/* 출정서 낙관 — 장수 3명 도장 + 유저 닉네임 도장 */}
-                  <div style={{
-                    marginTop: '26px', paddingTop: '18px', borderTop: '1px dashed rgba(184,147,90,0.4)',
-                    display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px',
-                  }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginRight: '6px' }}>출진 서명</span>
-                    {deck.deck_setup.map((g, i) => (
-                      <SealStamp
-                        key={i}
-                        label={g.general_name}
-                        rotate={i % 2 === 0 ? -6 : 5}
-                      />
-                    ))}
-                    {myNickname && (
-                      <SealStamp label={myNickname} tone="user" rotate={4} />
-                    )}
                   </div>
 
                 </div>

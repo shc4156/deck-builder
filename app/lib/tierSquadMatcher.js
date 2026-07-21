@@ -1,4 +1,3 @@
-
 // 티어덱 기반 1단계: 장수 가용 여부만 체크, 전법은 원본 추천값을 그대로 담아두고
 // 최종 확정은 squadRecommendation.js의 resolveGlobalTactics에 맡긴다.
 
@@ -14,7 +13,6 @@ export function parseTierScore(tierName) {
 export function pickTierSquads(tierDecks, ownedGeneralNames, maxSquads = 5) {
   const availableGeneralNames = new Set(ownedGeneralNames);
   const usedDeckIds = new Set();
-
   const sortedDecks = [...tierDecks].sort(
     (a, b) => parseTierScore(b.tier_name) - parseTierScore(a.tier_name)
   );
@@ -24,8 +22,7 @@ export function pickTierSquads(tierDecks, ownedGeneralNames, maxSquads = 5) {
   for (let squadNum = 1; squadNum <= maxSquads; squadNum++) {
     let chosenDeck = null;
 
-
-    for (const deck of tierDecks) {
+    for (const deck of sortedDecks) {
       if (usedDeckIds.has(deck.id)) continue;
       if (!deck.deck_setup || !Array.isArray(deck.deck_setup)) continue;
 
@@ -49,13 +46,9 @@ export function pickTierSquads(tierDecks, ownedGeneralNames, maxSquads = 5) {
       squadNum,
       deck_setup: chosenDeck.deck_setup.map(g => ({
         general_name: g.general_name,
-
-        // tactics: [{ main, sub: [] }, { main, sub: [] }] 슬롯별 구조 그대로 전달
-        tactics: g.tactics || [],
+        added_tactics: [...(g.added_tactics || [null, null])],
         arts_of_war: g.arts_of_war,
-        stat_focus: g.stat_focus,
-        equipment_options: g.equipment_options,
-
+        stat_focus: g.stat_focus
       })),
       source: 'tier_deck'
     });

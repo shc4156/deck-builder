@@ -12,29 +12,25 @@ import ScreenshotChecker from './components/ScreenshotChecker';
 
 export default function MyDeckPage() {
   const {
-  generals = [], 
-  tactics = [], 
-  synergies = [], 
-  tierDecks = [], 
-  isLoading,
-  selectedGenerals = [], 
-  selectedTactics = [],
-  toggleGeneral, 
-  toggleTactic,
-  saveDeck, 
-  isSaving, 
-  countdown
+  generals, tactics, synergies, tierDecks, isLoading,
+  selectedGenerals, selectedTactics,
+  toggleGeneral, toggleTactic,
+  saveDeck, isSaving, countdown
 } = useDeckAssets();
 
   const [activeTab, setActiveTab] = useState('my-assets');
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const tabFromUrl = params.get('tab');
-  if (tabFromUrl && ['my-assets', 'dictionary', 'deck-analyzer'].includes(tabFromUrl)) {
-    setActiveTab(tabFromUrl);
-  }
-}, []);
+  // 다른 페이지(예: 티어덱 매칭)에서 ?tab=dictionary 같은 쿼리를 달고 들어왔을 때
+  // 해당 탭으로 바로 열리도록 반영 (useSearchParams는 Suspense가 필요해서 window로 직접 처리)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl && ['my-assets', 'dictionary', 'auto-squad'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, []);
+
+  
 
   // '통합 도감' 탭 전용: 현재 보유 장수 조합으로 활성화된 인연을 뽑는 함수
   const getActiveSynergies = () => {
@@ -174,6 +170,7 @@ useEffect(() => {
                 selectedTactics={selectedTactics}
               />
             )}
+
           </>
         )}
       </div>
