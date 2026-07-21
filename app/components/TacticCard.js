@@ -78,8 +78,4 @@ export default function TacticCard({ tactic, isSelected, onSelect }) {
       )}
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> d4eb085 (전체 수정)
