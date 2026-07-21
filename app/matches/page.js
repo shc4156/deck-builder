@@ -54,11 +54,10 @@ export default function MatchesPage() {
     await supabase.from('profiles').update({ pinned_decks: newPins }).eq('id', user.id);
   };
 
-  // 🛠️ 수파베이스 신규 데이터 구조(hero1, hero2, hero3)를 기존 deck_setup 객체 형태로 파싱
+  // 🛠️ 메인 전법과 서브/대체 전법을 명확히 분리하여 파싱
   const parseDeckSetup = (deck) => {
     const heroes = [];
     
-    // 안전한 JSON 파싱 헬퍼
     const parseJson = (val) => {
       if (!val) return [];
       if (Array.isArray(val)) return val;
@@ -69,21 +68,21 @@ export default function MatchesPage() {
       const name = deck[`hero${i}_name`]?.trim();
       if (!name) continue;
 
-      const t1Main = deck[`hero${i}_tactic1_main`];
+      const t1Main = deck[`hero${i}_tactic1_main`]?.trim();
       const t1Sub = parseJson(deck[`hero${i}_tactic1_sub`]);
-      const t2Main = deck[`hero${i}_tactic2_main`];
+      const t2Main = deck[`hero${i}_tactic2_main`]?.trim();
       const t2Sub = parseJson(deck[`hero${i}_tactic2_sub`]);
 
-      // 메인 전법 + 서브 전법을 합쳐서 추천 전법 배열 생성
       const mainTactics = [t1Main, t2Main].filter(Boolean);
-      const subTactics = [...t1Sub, ...t2Sub].filter(Boolean);
-      const addedTactics = [...mainTactics, ...subTactics];
+      // DB에 명시된 서브/대체 전법들
+      const dbSubTactics = [...t1Sub, ...t2Sub].filter(Boolean);
 
       heroes.push({
         general_name: name,
         stat_focus: deck[`hero${i}_stat`] || '속성 미정',
-        added_tactics: addedTactics,
-        main_tactics: mainTactics,
+        main_tactics: mainTactics,       // 메인 추천 전법
+        db_sub_tactics: dbSubTactics,   // DB 등록 대체 전법
+        added_tactics: mainTactics,     // 매칭 및 UI 메인 노출용
         arts_of_war: {
           unique: deck[`hero${i}_unique_art_of_war`],
           common: parseJson(deck[`hero${i}_common_art_of_war`])
