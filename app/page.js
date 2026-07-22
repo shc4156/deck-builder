@@ -73,6 +73,7 @@ export default function MyDeckPage() {
           <Link href="/squads" className="classic-tab">
             1-5군 추천 편성
           </Link>
+          <Link href="/vs" className="classic-tab">⚔️ 모의 대결</Link>
         </nav>
 
         {isLoading ? (

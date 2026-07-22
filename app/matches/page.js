@@ -193,6 +193,7 @@ const togglePin = async (deckId) => {
           <Link href="/?tab=dictionary" className="classic-tab">통합 도감</Link>
           <span className="classic-tab active">티어덱 매칭</span>
           <Link href="/squads" className="classic-tab">1-5군 추천 편성</Link>
+          <Link href="/vs" className="classic-tab">⚔️ 모의 대결</Link>
         </nav>
 
         <h1 className="classic-heading text-3xl font-bold mb-2">티어덱 &amp; 개척추천 매칭</h1>
@@ -298,7 +299,19 @@ const togglePin = async (deckId) => {
                       군진효과: {formationInfo.effect}
                     </div>
                   </div>
-                  <FormationGridVisual gridData={formationGrid} />
+                  {/* ⭕ 수정: 0과 1 위치에 맞춰 실제 장수 이름(parsedSetup)을 매핑한 배열 전달 */}
+<FormationGridVisual 
+  gridData={(() => {
+    let heroIdx = 0;
+    // formationGrid [0, 1, 1, 1, 0, 0]의 1인 위치에 parsedSetup의 장수 이름을 차례대로 채워넣음
+    return formationGrid.map(val => {
+      if (val === 1 && parsedSetup[heroIdx]) {
+        return parsedSetup[heroIdx++].general_name;
+      }
+      return '';
+    });
+  })()} 
+/>
                 </div>
 
                 {/* 장수 카드 3인 목록 */}

@@ -1,430 +1,275 @@
-import { SYNERGY_MASTER } from '../data/synergies';
-import { COMMON_ARTS_OF_WAR, getArtsCategoryForGeneral } from '../data/artsOfWar';
-import { findAlternativeTactics } from '../data/tacticAlternatives';
-// [신규] deckEngineData(장수 연결점수) 기반 로직 재사용 - app/lib/squadOptimizer.js
-import { connectionScoreOf, findBestSynergyTrio, pickFormationForTrio } from '../app/lib/squadOptimizer';
+import { getFormationForTrio, connectionScoreOf } from '../app/lib/squadOptimizer';
 
-function parseUniqueArts(raw) {
-  if (!raw) return null;
-  if (typeof raw === 'object') return raw;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && Object.keys(parsed).length > 0 ? parsed : null;
-  } catch {
-    return null;
-  }
-}
+/**
+ * 장수와 전법 간의 적합도 점수(0~100점) 정밀 계산 함수
+ */
+export function evaluateTacticFit(generalObj, tacticObj) {
+  if (!generalObj || !tacticObj) return 50;
 
-function getDefaultArtsOfWar(generalData) {
-  const category = getArtsCategoryForGeneral(generalData);
-  const pool = COMMON_ARTS_OF_WAR[category] || [];
-  const poolNames = pool.map(a => a.name);
+  let score = 50; // 기본 시작 점수
 
-  const uniqueArts = parseUniqueArts(generalData?.unique_arts);
+  // 스탯 숫자로 변환 (기본값 설정)
+  const str = parseFloat(generalObj.strength || 100);
+  const int = parseFloat(generalObj.intelligence || 100);
+  const cmd = parseFloat(generalObj.command || 100);
+  const primaryRole = generalObj.primary_role || '';
+  const preferredType = generalObj.preferred_tactic_type || '';
 
-  if (uniqueArts) {
-    const uniqueName = Object.keys(uniqueArts)[0];
-    return { common: poolNames.slice(0, 2), unique: uniqueName };
-  }
-
-  return { common: poolNames.slice(0, 3), unique: null };
-}
-
-function getStatFocusLabel(generalData) {
-  if (!generalData) return '균형 투자';
-  const stats = {
-    지력: Number(generalData.intelligence ?? 0),
-    무력: Number(generalData.strength ?? 0),
-    통솔: Number(generalData.command ?? 0),
-  };
-  const [topStat] = Object.entries(stats).sort((a, b) => b[1] - a[1])[0];
-  return topStat;
-}
-
-// [신규] 티어덱 템플릿 없이(재구성 단계) 새로 짠 3인조에 장비 추천 속성을 붙일 때 사용.
-// squadOptimizer.js의 recommendArtsAndEquipment는 unique_tactic_name 필드를 참조하는데
-// 이 프로젝트의 실제 장수 스키마(unique_arts JSON)와 안 맞아서, 기존 getStatFocusLabel과
-// 동일한 스탯 소스로 상위 2개 스탯만 뽑는 간단한 버전을 자체적으로 둔다.
-function getEquipmentOptions(generalData) {
-  if (!generalData) return ['균형 투자'];
-  const stats = {
-    지력: Number(generalData.intelligence ?? 0),
-    무력: Number(generalData.strength ?? 0),
-    통솔: Number(generalData.command ?? 0),
-  };
-  return Object.entries(stats).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k);
-}
-
-function generateSquadName(finalizedSetup) {
-  return finalizedSetup.map(g => g.general_name.trim().charAt(0)).join('');
-}
-
-const MIN_TIER_WEIGHT = 0.5;
-
-function parseTierScore(tierName) {
-  const match = (tierName || '').match(/T(\d)([+-]?)/);
-  if (!match) return -1;
-  const num = parseInt(match[1], 10);
-  const modifier = match[2] === '+' ? 0.3 : match[2] === '-' ? -0.3 : 0;
-  return (10 - num) + modifier;
-}
-
-export function buildTacticFrequencyMap(tierDecks, options = {}) {
-  const { altWeight = 0.4, minCount = 0 } = options;
-  const map = new Map();
-
-  const bump = (generalName, tacticName, amount) => {
-    if (!generalName || !tacticName || tacticName === '미장착') return;
-    if (!map.has(generalName)) map.set(generalName, new Map());
-    const inner = map.get(generalName);
-    inner.set(tacticName, (inner.get(tacticName) || 0) + amount);
-  };
-
-  for (const deck of tierDecks || []) {
-    const weight = Math.max(parseTierScore(deck.tier_name), MIN_TIER_WEIGHT);
-
-    for (const gSetup of deck.deck_setup || []) {
-      const name = gSetup.general_name?.trim();
-      if (!name) continue;
-
-      (gSetup.added_tactics || []).forEach(t => {
-        if (t) bump(name, t, weight);
-      });
-      (gSetup.alt_tactics || []).forEach(t => {
-        if (t) bump(name, t, weight * altWeight);
-      });
+  // 1. 수파베이스 generals 테이블의 recommended_tactics(추천 전법) 검증
+  let recommendedList = [];
+  if (Array.isArray(generalObj.recommended_tactics)) {
+    recommendedList = generalObj.recommended_tactics;
+  } else if (typeof generalObj.recommended_tactics === 'string') {
+    try {
+      recommendedList = JSON.parse(generalObj.recommended_tactics);
+    } catch {
+      recommendedList = generalObj.recommended_tactics.split(',').map(s => s.trim());
     }
   }
 
-  if (minCount > 0) {
-    for (const inner of map.values()) {
-      for (const [tacticName, score] of inner) {
-        if (score < minCount) inner.delete(tacticName);
-      }
-    }
+  // 💡 공식 추천 전법에 포함되어 있으면 최우선 가산점 부여 (+35점)
+  const isRecommended = recommendedList.some(
+    recName => recName.trim() === tacticObj.name?.trim()
+  );
+  if (isRecommended) {
+    score += 35;
   }
 
-  return map;
+  // 2. 전법 카테고리/속성에 따른 역할군(primary_role) 매칭 로직
+  const category = tacticObj.category || '';
+  const tacName = tacticObj.name || '';
+  const tacEffect = tacticObj.effect || '';
+
+  // 전법 성격 분류
+  const isMagicDamage = category === 'magic_strategy' || tacEffect.includes('책략 피해');
+  const isPhysicalDamage = category === 'attack_power_pursuit' || tacEffect.includes('병기 피해');
+  const isDefenseSurvival = category === 'defense_survival' || tacEffect.includes('피해 감소') || tacEffect.includes('통솔');
+  const isHealSupport = category === 'healing_support' || tacEffect.includes('회복') || tacEffect.includes('치유');
+
+  // 3. 역할군별(Role) 정밀 점수 가감산
+  if (primaryRole.includes('탱커') || primaryRole.includes('방어')) {
+    // 황개, 조조, 조인 등 방어형 장수
+    if (isDefenseSurvival || isHealSupport) score += 15;
+    if (isMagicDamage && !primaryRole.includes('책략')) score -= 25; // 방어장수에게 순수 책략딜은 감점
+  } else if (primaryRole.includes('딜_병기')) {
+    // 무력 물딜러 (마초, 관우, 여포 등)
+    if (isPhysicalDamage) score += 15;
+    if (isMagicDamage) score -= 30; // 물리 딜러에게 책략딜 강력 감점
+  } else if (primaryRole.includes('딜_책략')) {
+    // 지장 딜러 (제갈량, 주유, 정욱 등)
+    if (isMagicDamage) score += 20;
+    if (isPhysicalDamage) score -= 30;
+  } else if (primaryRole.includes('힐러')) {
+    if (isHealSupport) score += 25;
+    if (isPhysicalDamage || isMagicDamage) score -= 15;
+  }
+
+  // 4. 스탯 자격 검증 (지력/무력 차이에 따른 보정)
+  if (isMagicDamage) {
+    if (int < 160) score -= 20; // 지력이 낮은 경우 책략 전법 점수 삭감
+    else score += Math.floor((int - 160) / 10);
+  }
+  if (isPhysicalDamage) {
+    if (str < 160) score -= 20; // 무력이 낮은 경우 병기 전법 점수 삭감
+    else score += Math.floor((str - 160) / 10);
+  }
+
+  // 5. 점수 범위 보정 (최대 100점, 최소 10점)
+  return Math.min(100, Math.max(10, score));
 }
 
-function getTopTacticsByFrequency(generalName, tacticFrequencyMap) {
-  const inner = tacticFrequencyMap?.get(generalName);
-  if (!inner || inner.size === 0) return [];
-  return [...inner.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([tacticName]) => tacticName);
+/**
+ * 2. 특정 장수에게 가장 적합한 전법 2개 선별 (이미 사용된 전법 제외)
+ */
+function findBestTacticsForGeneral(general, availableTactics) {
+  if (!general || !availableTactics || availableTactics.length === 0) return [];
+
+  const scoredTactics = availableTactics.map(tac => ({
+    tactic: tac,
+    score: evaluateTacticFit(general, tac)
+  }));
+
+  // 적합도 높은 순으로 정렬
+  scoredTactics.sort((a, b) => b.score - a.score);
+
+  return scoredTactics.slice(0, 2).map(item => ({
+    name: item.tactic.name,
+    grade: item.tactic.grade || '황금',
+    score: item.score
+  }));
 }
 
-// 원본 대체 후보 탐색
-// 우선순위: 1) 수동 등록된 인연효과(SYNERGY_MASTER) 발동
-//           2) [신규] deckEngineData 연결점수(connectionScoreOf) 합이 가장 높은 후보
-//           3) primary_role 일치
-//           4) secondary_roles/tags 겹침
-//           5) 아무나
-function findBestSubstitute(originalGeneral, generals, myGenNames, usedGenerals, tempUsed, currentSquadNames) {
-  const isAvailable = (gen) => {
-    const n = gen.name.trim();
-    return myGenNames.includes(n) && !usedGenerals.has(n) && !tempUsed.has(n);
-  };
+/**
+ * 원본 전법과 유사한 대체 전법 가산점 연산
+ */
+export function getTacticSimilarityScore(originalTactic, candidateTactic) {
+  if (!originalTactic || !candidateTactic) return 0;
+  if (originalTactic.id === candidateTactic.id) return 0;
 
-  const candidates = generals.filter(isAvailable);
-  if (candidates.length === 0) return null;
+  let similarityBonus = 0;
 
-  if (currentSquadNames && currentSquadNames.length > 0) {
-    const synergyCandidate = candidates.find(g => {
-      const name = g.name.trim();
-      return SYNERGY_MASTER.some(syn => {
-        if (!syn.members.includes(name)) return false;
-        const overlapWithSquad = syn.members.filter(m => currentSquadNames.includes(m)).length;
-        return overlapWithSquad + 1 >= syn.req;
-      });
-    });
-    if (synergyCandidate) return synergyCandidate.name.trim();
-
-    // [신규] 2순위: 이미 배치된 장수들과의 deckEngineData 연결점수 합이 가장 높은 후보.
-    // SYNERGY_MASTER만큼 확정적이진 않지만, role/tag 매칭보다는 신뢰도 높은 실전 분석
-    // 데이터라 그 다음 순서로 둔다. 합산 점수가 0보다 클 때만 채택.
-    let bestConnCandidate = null;
-    let bestConnScore = 0;
-    for (const g of candidates) {
-      const name = g.name.trim();
-      const connScore = currentSquadNames.reduce((sum, existing) => sum + connectionScoreOf(name, existing), 0);
-      if (connScore > bestConnScore) {
-        bestConnScore = connScore;
-        bestConnCandidate = name;
-      }
-    }
-    if (bestConnCandidate) return bestConnCandidate;
+  // 1. 카테고리 동일 여부 (defense_survival, magic_strategy, healing_support 등)
+  if (originalTactic.category && originalTactic.category === candidateTactic.category) {
+    similarityBonus += 25;
   }
 
-  if (originalGeneral) {
-    const roleMatch = candidates.find(g => g.primary_role === originalGeneral.primary_role);
-    if (roleMatch) return roleMatch.name.trim();
+  // 2. 효과 텍스트(effect) 기반 핵심 키워드 일치 여부
+  const keywords = ['책략 피해', '병기 피해', '회복', '방어', '공포', '요술', '무장 해제', '능력 소진', '간파', '관통'];
+  const origEffect = originalTactic.effect || '';
+  const candEffect = candidateTactic.effect || '';
 
-    const origSecondary = originalGeneral.secondary_roles || [];
-    if (origSecondary.length > 0) {
-      const tagMatch = candidates.find(g => {
-        const gSecondary = g.secondary_roles || [];
-        return gSecondary.some(tag => origSecondary.includes(tag));
-      });
-      if (tagMatch) return tagMatch.name.trim();
+  keywords.forEach(kw => {
+    if (origEffect.includes(kw) && candEffect.includes(kw)) {
+      similarityBonus += 15;
     }
-  }
+  });
 
-  return candidates[0].name.trim();
+  return similarityBonus;
 }
 
-function findBestTactics(generalData, tactics, selectedTactics, usedTactics, count, tacticFrequencyMap) {
-  const isAvailable = (t) => selectedTactics.includes(t.id) && !usedTactics.has(t.name);
-  const pool = tactics.filter(isAvailable);
-
-  const result = [];
-  const localUsed = new Set();
-
-  const takeFrom = (list) => {
-    for (const t of list) {
-      if (result.length >= count) break;
-      if (localUsed.has(t.name)) continue;
-      result.push(t);
-      localUsed.add(t.name);
-    }
-  };
-
-  if (generalData) {
-    if (generalData.preferred_tactic_type) {
-      const typeMatched = pool
-        .filter(t => t.role === generalData.preferred_tactic_type)
-        .sort((a, b) => (b.grade === '황금' ? 1 : 0) - (a.grade === '황금' ? 1 : 0));
-      takeFrom(typeMatched);
-    }
-
-    if (result.length < count && tacticFrequencyMap) {
-      const rankedNames = getTopTacticsByFrequency(generalData.name, tacticFrequencyMap);
-      if (rankedNames.length > 0) {
-        const poolByName = new Map(pool.map(t => [t.name, t]));
-        const freqMatched = rankedNames.map(name => poolByName.get(name)).filter(Boolean);
-        takeFrom(freqMatched);
-      }
-    }
-
-    if (result.length < count) {
-      const roleMatched = pool
-        .filter(t => t.role === generalData.primary_role)
-        .sort((a, b) => (b.grade === '황금' ? 1 : 0) - (a.grade === '황금' ? 1 : 0));
-      takeFrom(roleMatched);
-    }
-
-    if (result.length < count) {
-      const secondary = generalData.secondary_roles || [];
-      const tagMatched = pool
-        .filter(t => !localUsed.has(t.name) && (t.tags || []).some(tag => secondary.includes(tag)))
-        .sort((a, b) => (b.grade === '황금' ? 1 : 0) - (a.grade === '황금' ? 1 : 0));
-      takeFrom(tagMatched);
-    }
-  }
-
-  if (result.length < count) {
-    const rest = pool
-      .filter(t => !localUsed.has(t.name))
-      .sort((a, b) => (b.grade === '황금' ? 1 : 0) - (a.grade === '황금' ? 1 : 0));
-    takeFrom(rest);
-  }
-
-  return result;
-}
-
-function resolveTacticsForGeneral(generalData, originalTacticNames, tactics, generals, selectedTactics, usedTactics, count = 2, tacticFrequencyMap) {
-  const result = [];
-  const localUsed = new Set();
-
-  for (const tacName of originalTacticNames || []) {
-    if (result.length >= count) break;
-    const tacData = tactics.find(t => t.name === tacName);
-
-    if (tacData && selectedTactics.includes(tacData.id) && !usedTactics.has(tacData.name) && !localUsed.has(tacData.name)) {
-      result.push(tacData);
-      localUsed.add(tacData.name);
-      continue;
-    }
-
-    if (!tacName) continue;
-    const combinedUsed = new Set([...usedTactics, ...localUsed]);
-    const alts = findAlternativeTactics({
-      generalName: generalData?.name,
-      recommendedTacticName: tacName,
-      tactics,
-      generals,
-      selectedTactics,
-      usedTacticsInDeck: Array.from(combinedUsed),
-      limit: 1,
-    });
-
-    if (alts.length > 0) {
-      const altData = tactics.find(t => t.name === alts[0]);
-      if (altData && !localUsed.has(altData.name)) {
-        result.push(altData);
-        localUsed.add(altData.name);
-      }
-    }
-  }
-
-  if (result.length < count) {
-    const combinedUsed = new Set([...usedTactics, ...localUsed]);
-    const additional = findBestTactics(generalData, tactics, selectedTactics, combinedUsed, count - result.length, tacticFrequencyMap);
-    additional.forEach(t => {
-      if (!localUsed.has(t.name)) {
-        result.push(t);
-        localUsed.add(t.name);
-      }
-    });
-  }
-
-  return result;
-}
-
-export function buildOptimalSquads({ tierDecks, generals, tactics, myGenNames, myTactNames, pinnedDeckIds, selectedTactics, tacticFrequencyMap }) {
+/**
+ * 3. [메인 메커니즘] 1~5군 자동 편성 및 전법 낙수 배정
+ */
+export function buildOptimalSquads({
+  tierDecks = [],
+  generals = [],
+  tactics = [],
+  myGenNames = [],
+  myTactNames = [],
+  pinnedDeckIds = []
+}) {
   const usedGenerals = new Set();
   const usedTactics = new Set();
-  const squads = [];
+  const resultSquads = [];
 
-  const freqMap = tacticFrequencyMap || buildTacticFrequencyMap(tierDecks);
+  // 내 보유 자산 실체화
+  const availableGeneralsPool = generals.filter(g => myGenNames.includes(g.name?.trim()));
+  const availableTacticsPool = tactics.filter(t => myTactNames.includes(t.name?.trim()));
 
-  const findGeneralData = (name) => generals.find(g => g.name.trim() === name.trim());
+  // 1단계: 티어덱 스캔 (최대 5개 군단 생성)
+  for (let i = 0; i < tierDecks.length && resultSquads.length < 5; i++) {
+    const deck = tierDecks[i];
+    const rawSetup = Array.isArray(deck.deck_setup) ? deck.deck_setup : [];
+    if (rawSetup.length === 0) continue;
 
-  const prioritizedDecks = [...tierDecks].sort((a, b) => (pinnedDeckIds.includes(a.id) ? -1 : 1));
+    const deckGenNames = rawSetup.map(s => (s?.general_name || '').trim()).filter(Boolean);
 
-  for (const deck of prioritizedDecks) {
-    if (squads.length >= 5) break;
-
-    // [신규] 보유율(커버리지) 게이트: 핀 고정 덱은 항상 템플릿으로 사용.
-    // 그 외 덱은 원본 3명 중 과반(2명 이상)을 실제로 보유·사용 가능해야만 템플릿으로 씀.
-    // 커버리지가 낮은 덱(예: 3명 중 1명 이하 보유)은 여기서 건너뛰고, 해당 장수들은
-    // 나중에 "재구성 단계"에서 deckEngineData 연결점수 기반으로 자유롭게 조합된다.
+    // 보유 중이고 아직 미사용된 장수 체크
+    const ownedAvailable = deckGenNames.filter(n => myGenNames.includes(n) && !usedGenerals.has(n));
     const isPinned = pinnedDeckIds.includes(deck.id);
-    const deckGeneralNames = deck.deck_setup.map(g => g.general_name.trim());
-    const ownedAvailableCount = deckGeneralNames.filter(
-      n => myGenNames.includes(n) && !usedGenerals.has(n)
-    ).length;
-    const isHighCoverage = isPinned || ownedAvailableCount >= Math.ceil(deckGeneralNames.length / 2);
 
-    if (!isHighCoverage) continue;
+    // 고정 덱이거나 최소 1명 이상 보유 시 덱 구성 시도
+    if (!isPinned && ownedAvailable.length === 0) continue;
 
-    let tempUsed = new Set();
+    const squadSetup = [];
+    const currentSquadGenNames = [];
 
-    const setup = deck.deck_setup.map(g => {
-      let name = g.general_name.trim();
-      const originalGeneralData = findGeneralData(name);
+    // 장수 3명 슬롯 채우기
+    for (let slotIdx = 0; slotIdx < 3; slotIdx++) {
+      const targetSetup = rawSetup[slotIdx] || {};
+      const targetName = (targetSetup.general_name || '').trim();
+
+      let assignedGeneral = null;
       let isSubstituted = false;
 
-      if (!myGenNames.includes(name) || usedGenerals.has(name) || tempUsed.has(name)) {
-        const currentSquadNames = Array.from(tempUsed);
-        const sub = findBestSubstitute(originalGeneralData, generals, myGenNames, usedGenerals, tempUsed, currentSquadNames);
-        if (sub) {
-          name = sub;
+      if (targetName && myGenNames.includes(targetName) && !usedGenerals.has(targetName)) {
+        // [원래 장수 배치]
+        assignedGeneral = generals.find(g => g.name?.trim() === targetName);
+        usedGenerals.add(targetName);
+      } else {
+        // [대체 장수 자동 발굴]
+        const substitute = availableGeneralsPool.find(g => !usedGenerals.has(g.name?.trim()));
+        if (substitute) {
+          assignedGeneral = substitute;
+          usedGenerals.add(substitute.name.trim());
           isSubstituted = true;
         }
       }
 
-      tempUsed.add(name);
-      return { ...g, general_name: name, isSubstituted };
-    });
+      if (assignedGeneral) {
+        currentSquadGenNames.push(assignedGeneral.name);
 
-    const finalized = setup.map(g => {
-      const generalData = findGeneralData(g.general_name);
+        // 남은 전법 풀에서 최적의 전법 2개 추천 배정
+        const remainingTactics = availableTacticsPool.filter(t => !usedTactics.has(t.name?.trim()));
+        const bestTactics = findBestTacticsForGeneral(assignedGeneral, remainingTactics);
 
-      const originalTacticNames = g.isSubstituted ? [] : (g.added_tactics || []);
-      const chosenTactics = resolveTacticsForGeneral(
-        generalData, originalTacticNames, tactics, generals, selectedTactics, usedTactics, 2, freqMap
-      );
+        // 사용한 전법 사용 처리
+        bestTactics.forEach(bt => usedTactics.add(bt.name));
 
-      const finalTactics = chosenTactics.map(t => {
-        usedTactics.add(t.name);
-        return { name: t.name, grade: t.grade };
-      });
-
-      while (finalTactics.length < 2) {
-        finalTactics.push({ name: '전법장착', grade: '보라' });
+        squadSetup.push({
+          general_name: assignedGeneral.name,
+          isSubstituted,
+          stat_focus: targetSetup.stat_focus || (assignedGeneral.attributes?.force > assignedGeneral.attributes?.intelligence ? '무력' : '지력'),
+          added_tactics_detailed: bestTactics,
+          arts_of_war: targetSetup.arts_of_war || { unique: '기본 병법', common: ['공격', '방어'] },
+          equipment_options: targetSetup.equipment_options || ['기본 장비']
+        });
       }
+    }
 
-      const troopType = generalData?.troop_type || '병종 미확인';
-      const statFocus = g.isSubstituted ? getStatFocusLabel(generalData) : g.stat_focus;
-
-      const artsOfWar = (g.isSubstituted || !g.arts_of_war)
-        ? getDefaultArtsOfWar(generalData)
-        : g.arts_of_war;
-
-      return {
-        ...g,
-        added_tactics_detailed: finalTactics,
-        troop_type: troopType,
-        stat_focus: statFocus,
-        arts_of_war: artsOfWar,
-      };
-    });
-
-    tempUsed.forEach(n => usedGenerals.add(n));
-
-    squads.push({
-      ...deck,
-      tier_name: generateSquadName(finalized),
-      original_tier_name: deck.tier_name,
-      deck_setup: finalized,
-      squadNum: squads.length + 1,
-    });
+    if (squadSetup.length > 0) {
+      resultSquads.push({
+        id: deck.id || `squad_${resultSquads.length + 1}`,
+        squadNum: resultSquads.length + 1,
+        deck_name: deck.deck_name || deck.tier_name || `제 ${resultSquads.length + 1} 군`,
+        formation: getFormationForTrio(currentSquadGenNames),
+        deck_setup: squadSetup,
+        description: deck.description || '최적화된 정예 조합'
+      });
+    }
   }
 
-  // [신규] 재구성 단계: 위에서 템플릿으로 못 쓰고 건너뛴 덱들의 장수, 그리고 애초에 어떤
-  // 티어덱에도 등장하지 않는 장수까지 포함한 "아직 안 쓰인 보유 장수 풀"에서, deckEngineData
-  // 연결점수+시너지 기반 조합 탐색(findBestSynergyTrio)으로 직접 3인조를 짜서 남은 군단
-  // 자리를 채운다. 여기서 만들어지는 덱은 특정 티어덱을 차용한 게 아니라 처음부터 연결
-  // 관계를 보고 조합된 것이므로 "대체(isSubstituted)" 표기를 하지 않는다.
-  while (squads.length < 5) {
-    const remainingPool = generals.filter(g => {
-      const n = g.name.trim();
-      return myGenNames.includes(n) && !usedGenerals.has(n);
-    });
-
-    const best = findBestSynergyTrio(remainingPool);
-    if (!best) break; // 3인조를 더 만들 수 있는 보유 장수가 부족함
-
-    const formation = pickFormationForTrio(best.trio);
-
-    const finalized = best.trio.map(generalData => {
-      const chosenTactics = resolveTacticsForGeneral(
-        generalData, [], tactics, generals, selectedTactics, usedTactics, 2, freqMap
-      );
-      const finalTactics = chosenTactics.map(t => {
-        usedTactics.add(t.name);
-        return { name: t.name, grade: t.grade };
-      });
-      while (finalTactics.length < 2) {
-        finalTactics.push({ name: '전법장착', grade: '보라' });
-      }
-
-      return {
-        general_name: generalData.name.trim(),
-        isSubstituted: false,
-        added_tactics_detailed: finalTactics,
-        troop_type: generalData?.troop_type || '병종 미확인',
-        stat_focus: getStatFocusLabel(generalData),
-        arts_of_war: getDefaultArtsOfWar(generalData),
-        equipment_options: getEquipmentOptions(generalData),
-      };
-    });
-
-    best.trio.forEach(g => usedGenerals.add(g.name.trim()));
-
-    squads.push({
-      id: `synergy-${squads.length + 1}`,
-      tier_name: generateSquadName(finalized),
-      original_tier_name: best.activeSynergies.length > 0
-        ? `연결 시너지 편성 (${best.activeSynergies[0]})`
-        : '연결 시너지 편성',
-      formation_grid: formation.grid,
-      deck_setup: finalized,
-      squadNum: squads.length + 1,
-    });
-  }
-
-  return squads;
+  return resultSquads;
 }
+
+// 남은 장수들 중 시너지(연의/인연/국가)가 가장 높은 3인 조합을 찾는 함수
+export const findBestSynergyGroup = (availableGenerals, connections, synergies) => {
+  if (availableGenerals.length < 3) return availableGenerals;
+
+  let bestGroup = [];
+  let maxScore = -1;
+
+  // 남은 장수 중 3명 조합을 탐색 (장수 수가 많을 경우 상위 장수 위주 탐색)
+  for (let i = 0; i < availableGenerals.length; i++) {
+    for (let j = i + 1; j < availableGenerals.length; j++) {
+      for (let k = j + 1; k < availableGenerals.length; k++) {
+        const trio = [availableGenerals[i], availableGenerals[j], availableGenerals[k]];
+        const names = trio.map(g => g.name);
+        const kingdoms = trio.map(g => g.kingdom);
+
+        let score = 0;
+
+        // ⚡ 1. 연의 관계 점수 (가장 높은 가산점)
+        const hasConn = connections.some(c => 
+          names.includes(c.leader_name?.trim()) && names.includes(c.follower_name?.trim())
+        );
+        if (hasConn) score += 500;
+
+        // 🔗 2. 인연 효과 점수
+        const hasSynergy = synergies.some(s => {
+          const members = typeof s.members === 'string' ? JSON.parse(s.members) : s.members;
+          const matchCount = members.filter(m => names.includes(m.trim())).length;
+          return matchCount >= (s.req_count || 2);
+        });
+        if (hasSynergy) score += 300;
+
+        // 🏛️ 3. 동일 국가(진영) 통일 점수
+        const kingdomCounts = kingdoms.reduce((acc, cur) => {
+          acc[cur] = (acc[cur] || 0) + 1;
+          return acc;
+        }, {});
+        const maxSameKingdom = Math.max(...Object.values(kingdomCounts));
+        
+        if (maxSameKingdom === 3) score += 200; // 3인 동일 국가
+        else if (maxSameKingdom === 2) score += 80; // 2인 동일 국가
+
+        if (score > maxScore) {
+          maxScore = score;
+          bestGroup = trio;
+        }
+      }
+    }
+  }
+
+  return bestGroup.length === 3 ? bestGroup : availableGenerals.slice(0, 3);
+};
