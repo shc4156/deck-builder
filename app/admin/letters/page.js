@@ -38,7 +38,7 @@ function emptyEntry(id) {
 function CharCounter({ current, limit }) {
   const over = current > limit;
   return (
-    <span style={{ fontWeight: 'bold', color: over ? '#c0392b' : 'var(--gold-soft)' }}>
+    <span style={{ fontWeight: 'bold', color: over ? '#c0392b' : 'var(--ink-text)', opacity: over ? 1 : 0.7 }}>
       {current} / {limit}자{over ? ' (초과!)' : ''}
     </span>
   );
@@ -86,7 +86,7 @@ function HighlightToolbar({ onWrap }) {
           {label} 강조
         </button>
       ))}
-      <span style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', alignSelf: 'center' }}>
+      <span style={{ fontSize: '0.8rem', color: 'var(--ink-text)', opacity: 0.65, alignSelf: 'center' }}>
         (강조할 부분을 드래그로 선택한 뒤 버튼을 눌러주세요)
       </span>
     </div>
@@ -347,10 +347,10 @@ function PresetBar({ label, presets, presetsLoading, selectedPresetId, presetNam
         )}
       </div>
       {presetsLoading && (
-        <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>프리셋 목록을 불러오는 중...</p>
+        <p style={{ fontSize: '0.8rem', color: 'var(--ink-text)', opacity: 0.6, marginTop: '6px' }}>프리셋 목록을 불러오는 중...</p>
       )}
       {!presetsLoading && selectedPresetId !== 'new' && (
-        <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
+        <p style={{ fontSize: '0.8rem', color: 'var(--ink-text)', opacity: 0.6, marginTop: '6px' }}>
           아래 내용을 자유롭게 수정한 뒤 "변경사항 저장"을 누르면 이 프리셋에 반영됩니다.
         </p>
       )}
@@ -594,7 +594,7 @@ function SiegeScheduleForm() {
             rows={2}
             style={{ width: '100%', padding: '10px', border: '1px solid rgba(184,147,90,0.4)', resize: 'vertical', fontFamily: 'inherit' }}
           />
-          <p style={{ fontSize: '0.8rem', color: 'var(--gold-soft)', marginTop: '6px' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-text)', opacity: 0.6, marginTop: '6px' }}>
             문구 안에 <code>{'{날짜}'}</code> 를 넣으면 위에서 입력한 날짜로 자동 치환됩니다.
           </p>
         </div>
@@ -1245,7 +1245,7 @@ function LetterPreview({ title, bodyText, copied, onCopy, category }) {
           {generating ? '생성 중...' : imgCopied ? '복사됨!' : '📋 이미지로 복사 (카톡용)'}
         </button>
       </div>
-      <p style={{ fontSize: '0.78rem', color: 'var(--gold-soft)', marginTop: '8px' }}>
+      <p style={{ fontSize: '0.78rem', color: 'var(--ink-text)', opacity: 0.6, marginTop: '8px' }}>
         "이미지로 복사"를 누르면 카카오톡 채팅창에 Ctrl+V(붙여넣기)로 바로 공유할 수 있습니다.
       </p>
 
@@ -1273,6 +1273,37 @@ function renderTemplateForm(templateId) {
 export default function LetterWriterPage() {
   const [templateId, setTemplateId] = useState('siege_schedule');
 
+  // 📜 작성인 닉네임 (서신 작성소 직인용)
+  const [userNickname, setUserNickname] = useState('백정');
+
+  useEffect(() => {
+    const fetchUserNickname = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('nickname')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('프로필 조회 실패:', error.message);
+          return;
+        }
+
+        if (profile && profile.nickname) {
+          setUserNickname(profile.nickname);
+        }
+      } catch (err) {
+        console.error('닉네임 로드 중 예외 발생:', err);
+      }
+    };
+
+    fetchUserNickname();
+  }, []);
+
   return (
     <PageLayout>
       <div style={{ padding: '25px', minHeight: '100vh' }}>
@@ -1292,28 +1323,83 @@ export default function LetterWriterPage() {
           ← 홈으로
         </Link>
 
-        <h1 className="classic-heading text-3xl font-bold mb-2">자동 서신 작성</h1>
-        <p style={{ color: 'var(--gold-soft)', marginBottom: '24px', fontSize: '1.05rem', fontWeight: 500 }}>
-          항목을 입력하면 제목 {TITLE_LIMIT}자 / 본문 {BODY_LIMIT}자 규칙에 맞춰 서신을 자동으로 완성합니다.
-        </p>
+        {/* ============================================================
+            📜 서신 작성소(書信作成所) — 문서형 헤더
+        ============================================================ */}
+        <div
+          style={{
+            position: 'relative',
+            background: 'linear-gradient(180deg, var(--paper-soft) 0%, var(--paper) 45%, var(--paper-soft) 100%)',
+            border: '3px double var(--gold)',
+            borderRadius: '6px',
+            padding: '30px 36px',
+            marginBottom: '30px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.16), inset 0 0 60px rgba(139,94,52,0.08)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{
+            position: 'absolute', inset: '8px', border: '1px solid rgba(139,94,52,0.3)',
+            borderRadius: '3px', pointerEvents: 'none'
+          }} />
 
-        <nav className="classic-tabbar" style={{ marginBottom: '30px' }}>
-          {LETTER_TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => t.status === 'ready' && setTemplateId(t.id)}
-              className={`classic-tab${templateId === t.id ? ' active' : ''}`}
-              style={{
-                border: 'none',
-                cursor: t.status === 'ready' ? 'pointer' : 'not-allowed',
-                opacity: t.status === 'ready' ? 1 : 0.5,
-              }}
-            >
-              {t.label}{t.status !== 'ready' ? ' (준비중)' : ''}
-            </button>
-          ))}
-        </nav>
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{
+              writingMode: 'vertical-rl', textOrientation: 'upright',
+              fontSize: '1.3rem', fontWeight: 900, letterSpacing: '0.2em',
+              color: 'var(--seal-dark)', flexShrink: 0, marginRight: '18px', lineHeight: 1.3
+            }}>
+              書信作成所
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <h1 className="classic-heading text-3xl font-bold mb-2" style={{ margin: 0 }}>
+                자동 서신 작성
+              </h1>
+              <p style={{ color: 'var(--ink-text)', opacity: 0.8, marginTop: '10px', fontSize: '1.05rem', fontWeight: 500 }}>
+                항목을 입력하면 제목 {TITLE_LIMIT}자 / 본문 {BODY_LIMIT}자 규칙에 맞춰 서신을 자동으로 완성합니다.
+              </p>
+            </div>
+
+            <div style={{ flexShrink: 0, marginLeft: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{
+                width: '58px', height: '58px',
+                border: '3px solid var(--seal-dark)',
+                borderRadius: '4px',
+                backgroundColor: 'rgba(139,41,31,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transform: 'rotate(-3deg)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+              }}>
+                <span style={{
+                  writingMode: 'vertical-rl', textOrientation: 'upright',
+                  fontSize: '0.8rem', fontWeight: 900, color: 'var(--seal-dark)', letterSpacing: '0.1em'
+                }}>
+                  {userNickname || '맹원'}撰
+                </span>
+              </div>
+              <span style={{ fontSize: '0.62rem', color: 'var(--ink-text)', opacity: 0.65, marginTop: '6px' }}>작성인 직인</span>
+            </div>
+          </div>
+
+          <nav className="classic-tabbar" style={{ position: 'relative', zIndex: 1, marginTop: '22px', paddingTop: '18px', borderTop: '1px dashed rgba(139,94,52,0.4)' }}>
+            {LETTER_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => t.status === 'ready' && setTemplateId(t.id)}
+                className={`classic-tab${templateId === t.id ? ' active' : ''}`}
+                style={{
+                  border: 'none',
+                  cursor: t.status === 'ready' ? 'pointer' : 'not-allowed',
+                  opacity: t.status === 'ready' ? 1 : 0.5,
+                }}
+              >
+                {t.label}{t.status !== 'ready' ? ' (준비중)' : ''}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         {renderTemplateForm(templateId)}
       </div>

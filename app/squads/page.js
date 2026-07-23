@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, useRef } from 'react'; // useRef 추가
-import html2canvas from 'html2canvas'; // 추가
+import { useState, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import Link from 'next/link';
 import PageLayout from '../components/PageLayout';
 import FormationGridVisual from '../components/FormationGridVisual';
@@ -9,19 +9,37 @@ import { matchFormationInfo } from '../../data/synergies';
 import { evaluateTacticFit } from '../../utils/squadEngine';
 import { supabase } from '../lib/supabaseClient';
 
+/* ============================================================
+   🎨 칙서(양피지) 테마 색상 팔레트
+   - 로직에는 영향 없음, 이 페이지 전용 색상 상수만 정의
+============================================================ */
+const SCROLL = {
+  paperLight: '#f6ecd2',
+  paperMid: '#eddfb8',
+  paperDark: '#e4d2a1',
+  paperTexture: 'rgba(139,94,52,0.06)',
+  ink: '#3a2a1a',
+  inkSoft: '#5a4630',
+  inkFaint: '#7a6448',
+  border: '#8b5e34',
+  borderSoft: 'rgba(139,94,52,0.35)',
+  seal: '#a8291f',
+  sealDark: '#7c1d16',
+  gold: '#a3782e',
+};
+
 const calculateAutoFormationGrid = (setupHeroes, generalsList = []) => {
   const grid = ['', '', '', '', '', ''];
 
   if (!setupHeroes || !Array.isArray(setupHeroes)) return grid;
 
   setupHeroes.forEach((hero, index) => {
-    // 장수 이름 추출 (객체 형태 또는 문자열 형태 모두 대응)
     const heroName = typeof hero === 'string' ? hero : hero?.general_name;
     if (!heroName) return;
 
     const col = index % 3; 
-    const frontIdx = col;     // 전열 (0, 1, 2)
-    const backIdx = col + 3;  // 후열 (3, 4, 5)
+    const frontIdx = col;
+    const backIdx = col + 3;
 
     const genObj = Array.isArray(generalsList) ? generalsList.find(g => g.name === heroName) : null;
     const pos = genObj?.position || '균형';
@@ -33,7 +51,6 @@ const calculateAutoFormationGrid = (setupHeroes, generalsList = []) => {
       if (!grid[backIdx]) grid[backIdx] = heroName;
       else if (!grid[frontIdx]) grid[frontIdx] = heroName;
     } else {
-      // 균형 장수인 경우: 슬롯 순서에 맞춰 기본 배치
       if (!grid[frontIdx]) grid[frontIdx] = heroName;
       else if (!grid[backIdx]) grid[backIdx] = heroName;
     }
@@ -42,7 +59,47 @@ const calculateAutoFormationGrid = (setupHeroes, generalsList = []) => {
   return grid;
 };
 
-// 1. 부대 내 전법 점유 상태 추적 헬퍼 함수
+const buildFormationNamedGrid = (setupHeroes, formation, generalsList) => {
+  const grid = ['', '', '', '', '', ''];
+  if (!setupHeroes || !formation) return grid;
+
+  let patternGrid = [];
+  try {
+    patternGrid = (Array.isArray(formation.grid) ? formation.grid : JSON.parse(formation.grid)).map(Number);
+  } catch {
+    patternGrid = [0, 1, 0, 0, 1, 1];
+  }
+
+  const frontSlots = [0, 1, 2].filter(i => patternGrid[i] === 1);
+  const backSlots = [3, 4, 5].filter(i => patternGrid[i] === 1);
+
+  const remaining = [...setupHeroes];
+
+  [...remaining].forEach(hero => {
+    const heroName = typeof hero === 'string' ? hero : hero?.general_name;
+    if (!heroName) return;
+    const genObj = generalsList.find(g => g.name === heroName);
+    const pos = genObj?.position || '균형';
+
+    if (pos === '전열' && frontSlots.length) {
+      grid[frontSlots.shift()] = heroName;
+      remaining.splice(remaining.indexOf(hero), 1);
+    } else if (pos === '후열' && backSlots.length) {
+      grid[backSlots.shift()] = heroName;
+      remaining.splice(remaining.indexOf(hero), 1);
+    }
+  });
+
+  remaining.forEach(hero => {
+    const heroName = typeof hero === 'string' ? hero : hero?.general_name;
+    if (!heroName) return;
+    if (frontSlots.length) grid[frontSlots.shift()] = heroName;
+    else if (backSlots.length) grid[backSlots.shift()] = heroName;
+  });
+
+  return grid;
+};
+
 const getAssignedTacticsMap = (squads) => {
   const map = new Map();
   if (!squads || !Array.isArray(squads)) return map;
@@ -66,7 +123,6 @@ const getAssignedTacticsMap = (squads) => {
   return map;
 };
 
-// 2. 현재 부대의 장수들과 연의 관계(Connection)가 존재하는 장수인지 판별
 const checkHasConnectionWithSquad = (candidateName, squadHeroNames, connections) => {
   if (!connections || !squadHeroNames || squadHeroNames.length === 0) return false;
   const cand = candidateName?.trim();
@@ -85,7 +141,6 @@ const checkHasConnectionWithSquad = (candidateName, squadHeroNames, connections)
   });
 };
 
-// 3. 원본 전법과 후보 전법 간 메커니즘 유사도 가산점 연산 함수
 const getTacticSimilarityScore = (originalTactic, candidateTactic) => {
   if (!originalTactic || !candidateTactic) return 0;
   if (originalTactic.id === candidateTactic.id) return 0;
@@ -109,7 +164,6 @@ const getTacticSimilarityScore = (originalTactic, candidateTactic) => {
   return similarityBonus;
 };
 
-// 4. 세 장수 이름의 첫 글자를 따서 덱 이름을 조합하는 함수 (예: 감녕, 노숙, 손책 -> 감노손덱)
 const generateSquadName = (setup, defaultName) => {
   if (!setup || setup.length === 0) return defaultName;
   
@@ -121,19 +175,82 @@ const generateSquadName = (setup, defaultName) => {
   return initials ? `${initials}덱` : defaultName;
 };
 
-export default function SquadsPage() {
-  
-  const exportRef = useRef(null); // 📜 이미지로 저장할 영역 레퍼런스
+const evaluateFormationFit = (squadSetup, formation, generalsList) => {
+  if (!squadSetup || !formation || !generalsList) return 50;
 
-  // 📸 출정칙서 이미지 저장 핸들러
+  let score = 50;
+  const formName = formation.name || '';
+  const formEffect = formation.effect || '';
+
+  let gridArr = [];
+  try {
+    if (Array.isArray(formation.grid)) {
+      gridArr = formation.grid;
+    } else if (typeof formation.grid === 'string') {
+      gridArr = formation.grid.includes('[') 
+        ? JSON.parse(formation.grid) 
+        : formation.grid.split(',').map(Number);
+    }
+  } catch {
+    gridArr = [0, 1, 0, 1, 0, 1];
+  }
+
+  const frontCount = gridArr.slice(0, 3).filter(v => Number(v) === 1).length;
+  const backCount = gridArr.slice(3, 6).filter(v => Number(v) === 1).length;
+
+  squadSetup.forEach((hero) => {
+    const gen = generalsList.find(g => g.name === hero.general_name);
+    if (!gen) return;
+
+    const pos = gen.position || '균형';
+    const mainStat = gen.main_stat || gen.stat_focus || '';
+    const role = gen.preferred_tactic_type || gen.primary_role || '';
+
+    if (pos === '전열' && frontCount >= 1) score += 10;
+    if (pos === '후열' && backCount >= 1) score += 10;
+
+    if (formName.includes('추형') || formEffect.includes('방어') || formEffect.includes('피해 감소') || formEffect.includes('통솔')) {
+      if (pos === '전열' && (mainStat.includes('통솔') || role.includes('방어') || role.includes('탱'))) {
+        score += 15;
+      }
+    }
+
+    if (formName.includes('안형') || formEffect.includes('피해 증가') || formEffect.includes('책략')) {
+      if (pos === '후열' && (mainStat.includes('지력') || mainStat.includes('무력') || role.includes('딜') || role.includes('공격') || role.includes('책략'))) {
+        score += 15;
+      }
+    }
+
+    if (formName.includes('극형') || formEffect.includes('발동률') || formEffect.includes('회심') || formEffect.includes('연타')) {
+      if (role.includes('액티브') || role.includes('추격') || role.includes('회심') || role.includes('공격') || mainStat.includes('무력')) {
+        score += 12;
+      }
+    }
+
+    if (formName.includes('방형') || formEffect.includes('회복') || formEffect.includes('지원')) {
+      if (role.includes('힐') || role.includes('버프') || role.includes('지원')) {
+        score += 10;
+      }
+    }
+  });
+
+  return Math.min(100, Math.max(30, score));
+};
+
+// 숫자를 한자 조(條) 번호로
+const HANJA_NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+
+export default function SquadsPage() {
+  const exportRef = useRef(null); 
+
   const handleDownloadImage = async () => {
     if (!exportRef.current) return;
 
     try {
       const canvas = await html2canvas(exportRef.current, {
-        backgroundColor: '#f4efe6', // 한지 느낌 배경색 유지 (var(--paper))
-        scale: 2, // 고해상도 (클리어한 텍스트 & 이미지)
-        useCORS: true, // 외부에 있는 장수 이미지 교차 출처 허용
+        backgroundColor: SCROLL.paperLight, 
+        scale: 2, 
+        useCORS: true, 
       });
 
       const image = canvas.toDataURL('image/png');
@@ -142,44 +259,41 @@ export default function SquadsPage() {
       link.download = `출정칙서_${new Date().toISOString().slice(0, 10)}.png`;
       link.click();
     } catch (err) {
-      console.error('❌ 출정칙서 이미지 저장 실패:', err);
+      console.error('출정칙서 이미지 저장 실패:', err);
     }
   };
 
-  // 기본값을 '잠호'로 세팅
-const [userNickname, setUserNickname] = useState('백정');
+  const [userNickname, setUserNickname] = useState('백정');
 
-useEffect(() => {
-  const fetchUserNickname = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  useEffect(() => {
+    const fetchUserNickname = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      // Supabase profiles 테이블에서 nickname 컬럼만 안전하게 조회
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('nickname')
-        .eq('id', user.id)
-        .maybeSingle();
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('nickname')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (error) {
-        console.error('프로필 조회 실패:', error.message);
-        return;
+        if (error) {
+          console.error('프로필 조회 실패:', error.message);
+          return;
+        }
+
+        if (profile && profile.nickname) {
+          setUserNickname(profile.nickname);
+        }
+      } catch (err) {
+        console.error('닉네임 로드 중 예외 발생:', err);
       }
+    };
 
-      if (profile && profile.nickname) {
-        setUserNickname(profile.nickname);
-      }
-    } catch (err) {
-      console.error('닉네임 로드 중 예외 발생:', err);
-    }
-  };
-
-  fetchUserNickname();
-}, []);
+    fetchUserNickname();
+  }, []);
 
   const [formations, setFormations] = useState([]);
-  const [currentFormationGrid, setCurrentFormationGrid] = useState(['', '', '', '', '', '']);
   const {
     generals = [],
     tactics = [],
@@ -189,65 +303,59 @@ useEffect(() => {
     selectedTactics = []
   } = useDeckAssets();
 
-  const [synergies, setSynergies] = useState([]); // 인연 데이터
-  const [recommendedSquads, setRecommendedSquads] = useState([]); // 1-5군 군단
-  const [editingTacticTarget, setEditingTacticTarget] = useState(null); // { squadId, heroIndex, tacticIndex, currentHeroName }
-  const [connections, setConnections] = useState([]); // Connection 데이터 State
+  const [synergies, setSynergies] = useState([]);
+  const [recommendedSquads, setRecommendedSquads] = useState([]);
+  const [editingTacticTarget, setEditingTacticTarget] = useState(null);
+  const [connections, setConnections] = useState([]);
+  const [needMoreGenerals, setNeedMoreGenerals] = useState(false);
 
-  // 💡 각 부대별 전/후열 위치 수동 교체 핸들러
-const handleGridCellClick = (squadId, clickedIdx) => {
-  setRecommendedSquads(prev => prev.map(squad => {
-    if (squad.id !== squadId) return squad;
+  const handleGridCellClick = (squadId, clickedIdx) => {
+    setRecommendedSquads(prev => prev.map(squad => {
+      if (squad.id !== squadId) return squad;
 
-    const currentGrid = Array.isArray(squad.formationGrid) 
-      ? [...squad.formationGrid] 
-      : ['', '', '', '', '', ''];
+      const currentGrid = Array.isArray(squad.formationGrid) 
+        ? [...squad.formationGrid] 
+        : ['', '', '', '', '', ''];
 
-    const targetIdx = clickedIdx < 3 ? clickedIdx + 3 : clickedIdx - 3; // 전열 ↔ 후열 스와프
+      const targetIdx = clickedIdx < 3 ? clickedIdx + 3 : clickedIdx - 3; 
 
-    // 위치 맞바꾸기
-    const temp = currentGrid[clickedIdx];
-    currentGrid[clickedIdx] = currentGrid[targetIdx];
-    currentGrid[targetIdx] = temp;
+      const temp = currentGrid[clickedIdx];
+      currentGrid[clickedIdx] = currentGrid[targetIdx];
+      currentGrid[targetIdx] = temp;
 
-    return {
-      ...squad,
-      formationGrid: currentGrid
-    };
-  }));
-};
+      return {
+        ...squad,
+        formationGrid: currentGrid
+      };
+    }));
+  };
 
-// 스퀘어 페이지 컴포넌트 내부
+  const handleSaveSquads = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
 
-const handleSaveSquads = async () => {
-  try {
-    // 1. 현재 로그인한 유저 확인
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      alert('로그인이 필요합니다.');
-      return;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ squads: recommendedSquads })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('스쿼드 저장 실패:', error);
+        alert('저장 중 오류가 발생했습니다: ' + error.message);
+      } else {
+        alert('1~5군 부대 편성이 성공적으로 저장되었습니다!');
+      }
+    } catch (err) {
+      console.error('저장 예외 발생:', err);
+      alert('저장 처리 중 오류가 발생했습니다.');
     }
+  };
 
-    // 2. profiles 테이블의 squads 컬럼에 현재 1~5군 데이터(recommendedSquads) 저장
-    const { error } = await supabase
-      .from('profiles')
-      .update({ squads: recommendedSquads }) // 👈 recommendedSquads 변수명으로 변경
-      .eq('id', user.id);
-
-    if (error) {
-      console.error('스쿼드 저장 실패:', error);
-      alert('저장 중 오류가 발생했습니다: ' + error.message);
-    } else {
-      alert('1~5군 부대 편성이 성공적으로 저장되었습니다!');
-    }
-  } catch (err) {
-    console.error('저장 예외 발생:', err);
-    alert('저장 처리 중 오류가 발생했습니다.');
-  }
-};
-
-  // Supabase 데이터 페칭
   useEffect(() => {
     async function fetchData() {
       try {
@@ -259,7 +367,7 @@ const handleSaveSquads = async () => {
           .select('*');
 
         if (connErr) {
-          console.error('❌ Connections 불러오기 실패:', connErr);
+          console.error('Connections 불러오기 실패:', connErr);
         } else if (connData) {
           setConnections(connData);
         }
@@ -269,7 +377,7 @@ const handleSaveSquads = async () => {
           .select('*');
 
         if (formErr) {
-          console.error('❌ Formations 불러오기 실패:', formErr);
+          console.error('Formations 불러오기 실패:', formErr);
         } else if (formationData) {
           setFormations(formationData);
         }
@@ -283,26 +391,24 @@ const handleSaveSquads = async () => {
   }, []);
 
   useEffect(() => {
-  async function loadSavedSquads() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    async function loadSavedSquads() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('squads')
-      .eq('id', user.id)
-      .single();
+      const { data } = await supabase
+        .from('profiles')
+        .select('squads')
+        .eq('id', user.id)
+        .single();
 
-    // DB에 저장된 squads 데이터가 있으면 주에 세팅
-    if (data && data.squads && data.squads.length > 0) {
-      setRecommendedSquads(data.squads); // 👈 주석 해제 후 setRecommendedSquads 적용
+      if (data && data.squads && data.squads.length > 0) {
+        setRecommendedSquads(data.squads);
+      }
     }
-  }
 
-  loadSavedSquads();
-}, []);
+    loadSavedSquads();
+  }, []);
 
-  // 🔗 인연(Synergies) 감지 함수
   const getActiveSynergies = (heroNames) => {
     if (!synergies || synergies.length === 0) return [];
     const cleanedDeckGens = heroNames.map(name => name?.trim()).filter(Boolean);
@@ -321,7 +427,6 @@ const handleSaveSquads = async () => {
     });
   };
 
-  // ⚡ 관계(General Connections) 감지 함수
   const getActiveConnections = (heroNames) => {
     if (!connections || connections.length === 0) return [];
     const cleanedDeckGens = heroNames.map(name => name?.trim()).filter(Boolean);
@@ -335,27 +440,53 @@ const handleSaveSquads = async () => {
     });
   };
 
-  // Connections 데이터 기반 연의 번호 부여 매핑
-  const getGeneralConnectionBadge = (heroName, connectionsList) => {
-    if (!connectionsList || connectionsList.length === 0 || !heroName) return '';
+  const TROOP_BONUS_RULES = {
+    '방패병': { 2: '받는 피해 3.5% 감소', 3: '받는 피해 5.0% 감소' },
+    '궁병': { 2: '주는 피해 3.5% 증가', 3: '주는 피해 5.0% 증가' },
+    '창병': { 2: '주는 피해 2.1% 증가, 받는 피해 1.4% 감소', 3: '주는 피해 3.0% 증가, 받는 피해 2.0% 감소' },
+    '기병': { 2: '주는 피해 1.4% 증가, 받는 피해 2.1% 감소', 3: '주는 피해 2.0% 증가, 받는 피해 3.0% 감소' },
+  };
+  const FACTION_BONUS_RULE = { 2: '모든 속성 +5%', 3: '모든 속성 +10%' };
 
-    const trimmedName = heroName.trim();
-    const matchedNumbers = [];
+  const getActiveTroopFactionBonuses = (heroNames, generalsList) => {
+    if (!heroNames || !generalsList) return [];
 
-    connectionsList.forEach((conn, index) => {
-      const leader = conn.leader_name?.trim();
-      const follower = conn.follower_name?.trim();
+    const genObjs = heroNames
+      .map(name => generalsList.find(g => g.name === name?.trim()))
+      .filter(Boolean);
 
-      if (leader === trimmedName || follower === trimmedName) {
-        matchedNumbers.push(index + 1);
+    const bonuses = [];
+
+    const troopCounts = {};
+    genObjs.forEach(g => { if (g.troop_type) troopCounts[g.troop_type] = (troopCounts[g.troop_type] || 0) + 1; });
+    Object.entries(troopCounts).forEach(([troop, count]) => {
+      if (count >= 2 && TROOP_BONUS_RULES[troop]) {
+        const tier = count >= 3 ? 3 : 2;
+        bonuses.push({ type: 'troop', label: `${troop} ${tier}명`, effect: TROOP_BONUS_RULES[troop][tier] });
       }
     });
 
-    if (matchedNumbers.length === 0) return '';
-    return `[연의 ${matchedNumbers.join(', ')}] `;
+    const factionCounts = {};
+    genObjs.forEach(g => { if (g.faction) factionCounts[g.faction] = (factionCounts[g.faction] || 0) + 1; });
+    Object.entries(factionCounts).forEach(([faction, count]) => {
+      if (count >= 2) {
+        const tier = count >= 3 ? 3 : 2;
+        bonuses.push({ type: 'faction', label: `${faction} 진영 ${tier}명`, effect: FACTION_BONUS_RULE[tier] });
+      }
+    });
+
+    return bonuses;
   };
 
-  // 🛡️ 진형(Formations) 매칭 함수
+  const getGeneralConnectionBadge = (heroName, connectionsList) => {
+    if (!connectionsList || connectionsList.length === 0 || !heroName) return '';
+    const trimmedName = heroName.trim();
+    const hasConnection = connectionsList.some(conn => 
+      conn.leader_name?.trim() === trimmedName || conn.follower_name?.trim() === trimmedName
+    );
+    return hasConnection ? '🔗' : '';
+  };
+
   const getMatchedFormation = (formationStr, formationsList) => {
     if (!formationsList || formationsList.length === 0) return { name: '기본 진형', effect: '효과 없음' };
     
@@ -368,137 +499,60 @@ const handleSaveSquads = async () => {
     return matched || { name: '추형진', effect: '전열 주는 피해 증가, 후열 받는 피해 감소' };
   };
 
-  // 장수 직접 변경 핸들러
-const handleGeneralChange = (squadId, heroIndex, newGeneralName) => {
-  const newGenObj = generals.find(g => g.name === newGeneralName);
+  const handleGeneralChange = (squadId, heroIndex, newGeneralName) => {
+    const newGenObj = generals.find(g => g.name === newGeneralName);
 
-  setRecommendedSquads(prev => prev.map(squad => {
-    if (squad.id !== squadId) return squad;
+    setRecommendedSquads(prev => prev.map(squad => {
+      if (squad.id !== squadId) return squad;
 
-    const newSetup = [...squad.setup];
-    newSetup[heroIndex] = {
-      ...newSetup[heroIndex],
-      general_name: newGeneralName,
-      image_url: newGenObj?.image_url || '/images/generals/default.jpg',
-      stat_focus: newGenObj?.stat_focus || '속성 미정',
-      isCustom: true
-    };
+      const newSetup = [...squad.setup];
+      newSetup[heroIndex] = {
+        ...newSetup[heroIndex],
+        general_name: newGeneralName,
+        image_url: newGenObj?.image_url || '/images/generals/default.jpg',
+        stat_focus: newGenObj?.stat_focus || '속성 미정',
+        isCustom: true
+      };
 
-    // 💡 1. 장수 구성에 따른 진형 그리드 자동 재배치
-    const newFormationGrid = calculateAutoFormationGrid(newSetup, generals);
+      const newFormationGrid = buildFormationNamedGrid(newSetup, squad.formationInfo, generals);
+      const updatedDeckName = generateSquadName(newSetup, squad.deck_name);
 
-    // 💡 2. 동적 군 이름 자동 갱신
-    const updatedDeckName = generateSquadName(newSetup, squad.deck_name);
+      return { 
+        ...squad, 
+        setup: newSetup,
+        deck_name: updatedDeckName,
+        formationGrid: newFormationGrid 
+      };
+    }));
+  };
 
-    return { 
-      ...squad, 
-      setup: newSetup,
-      deck_name: updatedDeckName,
-      formationGrid: newFormationGrid // 👈 자동 변경된 그리드 연동
-    };
-  }));
-};
+  const handleFormationChange = (squadId, targetFormationId) => {
+    const selectedForm = formations.find(f => String(f.id) === String(targetFormationId));
+    if (!selectedForm) return;
 
-// 💡 부대 내 3명 장수와 특정 진형 간의 적합도 점수(0~100점) 계산 함수 (개선판)
-const evaluateFormationFit = (squadSetup, formation, generalsList) => {
-  if (!squadSetup || !formation || !generalsList) return 50;
+    setRecommendedSquads(prev => prev.map(squad => {
+      if (squad.id !== squadId) return squad;
 
-  let score = 50; // 기본 점수
-  let gridArr = [];
+      const newFormationGrid = buildFormationNamedGrid(squad.setup, selectedForm, generals);
 
-  // 🛡️ 안전한 grid 배열 파싱 및 예외 처리
-  try {
-    if (Array.isArray(formation.grid)) {
-      gridArr = formation.grid;
-    } else if (typeof formation.grid === 'string') {
-      gridArr = JSON.parse(formation.grid);
-    }
-  } catch {
-    gridArr = [0, 1, 0, 1, 0, 1];
-  }
+      return {
+        ...squad,
+        formationGrid: newFormationGrid,
+        formationInfo: selectedForm
+      };
+    }));
+  };
 
-  if (!Array.isArray(gridArr) || gridArr.length === 0) {
-    gridArr = [0, 1, 0, 1, 0, 1];
-  }
-
-  // 진형의 전열/후열 슬롯 개수 파악
-  const frontActiveCount = gridArr.slice(0, 3).filter(v => Number(v) === 1).length;
-  const backActiveCount = gridArr.slice(3, 6).filter(v => Number(v) === 1).length;
-
-  const effectText = formation.effect || '';
-  const formationName = formation.name || '';
-
-  squadSetup.forEach((hero) => {
-    const genObj = generalsList.find(g => g.name === hero.general_name);
-    if (!genObj) return;
-
-    const pos = genObj.position || '균형';
-    const mainStat = genObj.main_stat || '';
-    const role = genObj.primary_role || '';
-
-    // 1. 장수 선호 위치와 진형 구조의 부합도 (+10점)
-    if (pos === '전열' && frontActiveCount >= 1) score += 10;
-    if (pos === '후열' && backActiveCount >= 1) score += 10;
-
-    // 2. 후열 딜러 시너지 연산 (안형진 등 후열 피해 증가 진형 특화)
-    if (effectText.includes('후열') || formationName.includes('안형')) {
-      if (pos === '후열') {
-        score += 10; // 후열 위치 기본 시너지
-        // 지력/무력형 딜러일 경우 피해 증가 시너지 파격 가산 (+15점)
-        if (mainStat === '지력' || mainStat === '무력' || role.includes('공격') || role.includes('책략')) {
-          score += 15;
-        }
-      }
-    }
-
-    // 3. 전열 방어/탱커 시너지 연산
-    if (effectText.includes('전열') || formationName.includes('추형')) {
-      if (pos === '전열') {
-        if (mainStat === '통솔' || role.includes('방어') || role.includes('지원')) {
-          score += 15;
-        }
-      }
-    }
-
-    // 4. 기타 특수 시너지 (회심, 연타 등)
-    if (effectText.includes('회심') || effectText.includes('연타')) {
-      if (mainStat === '무력' || role.includes('공격')) score += 10;
-    }
-  });
-
-  return Math.min(100, Math.max(0, score)); // 0~100점 제한
-};
-
-// 진형 수동 변경 핸들러
-const handleFormationChange = (squadId, targetFormationId) => {
-  const selectedForm = formations.find(f => String(f.id) === String(targetFormationId));
-  if (!selectedForm) return;
-
-  let parsedGrid = [];
-  try {
-    parsedGrid = typeof selectedForm.grid === 'string' ? JSON.parse(selectedForm.grid) : selectedForm.grid;
-    parsedGrid = parsedGrid.map(Number);
-  } catch {
-    parsedGrid = [0, 1, 0, 1, 0, 1];
-  }
-
-  setRecommendedSquads(prev => prev.map(squad => {
-    if (squad.id !== squadId) return squad;
-
-    return {
-      ...squad,
-      formationGrid: parsedGrid,
-      formationInfo: selectedForm
-    };
-  }));
-};
-
-  // 전법 수동 변경 핸들러
   const handleTacticChange = (newTacticName) => {
     if (!editingTacticTarget) return;
 
     const { squadId, heroIndex, tacticIndex } = editingTacticTarget;
     const targetTacticObj = tactics.find(t => t.name?.trim() === newTacticName);
+
+    if (!targetTacticObj || !selectedTactics.includes(targetTacticObj.id)) {
+      alert('보유하지 않은 전법은 장착할 수 없습니다.');
+      return;
+    }
 
     setRecommendedSquads(prevSquads => prevSquads.map(squad => {
       if (squad.id !== squadId) return squad;
@@ -529,7 +583,6 @@ const handleFormationChange = (squadId, targetFormationId) => {
     setEditingTacticTarget(null);
   };
 
-  // 덱 파싱 함수
   const parseDeckSetup = (deck) => {
     const heroes = [];
     const parseJson = (val) => {
@@ -560,9 +613,13 @@ const handleFormationChange = (squadId, targetFormationId) => {
     return heroes;
   };
 
-  // 보유 장수/전법 기반 군단 자동 생성
   useEffect(() => {
     if (isLoading || !tierDecks.length) return;
+
+    if (selectedGenerals.length === 0) {
+      setRecommendedSquads([]);
+      return;
+    }
 
     const myGenerals = generals.filter(g => selectedGenerals.includes(g.id));
     const myGenNames = myGenerals.map(g => g.name?.trim());
@@ -573,6 +630,7 @@ const handleFormationChange = (squadId, targetFormationId) => {
     const usedGenerals = new Set();
     const usedTacticsInSquads = new Set();
     const squads = [];
+    let hasEmptySlot = false;  
 
     for (let i = 0; i < tierDecks.length && squads.length < 5; i++) {
       const deck = tierDecks[i];
@@ -585,7 +643,9 @@ const handleFormationChange = (squadId, targetFormationId) => {
 
         let assignedGen = isOwned 
           ? myGenerals.find(g => g.name?.trim() === targetName)
-          : generals.find(g => !usedGenerals.has(g.name?.trim()));
+          : myGenerals.find(g => !usedGenerals.has(g.name?.trim()));
+
+        if (!assignedGen) hasEmptySlot = true;
 
         if (assignedGen) usedGenerals.add(assignedGen.name?.trim());
 
@@ -646,28 +706,24 @@ const handleFormationChange = (squadId, targetFormationId) => {
         };
       });
 
-      // 💡 장수 조합 기반 전/후열 자동 그리드 연산 적용
-// 💡 숫자 형태의 진형 데이터 추출 (적합도 및 정보 매칭용)
-const rawFormationNumGrid = deck.formation ? deck.formation.split(',').map(Number) : [0, 1, 0, 0, 1, 1];
-const formationInfo = matchFormationInfo(rawFormationNumGrid);
+      const rawFormationNumGrid = deck.formation ? deck.formation.split(',').map(Number) : [0, 1, 0, 0, 1, 1];
+      const formationInfo = matchFormationInfo(rawFormationNumGrid);
+      const initialNamedGrid = calculateAutoFormationGrid(squadSetup, generals);
 
-// 💡 장수 이름이 들어가는 그리드 배열 자동 계산 (처음부터 장수 이름 표시!)
-const initialNamedGrid = calculateAutoFormationGrid(squadSetup, generals);
-
-squads.push({
-  id: deck.id || i,
-  squadNum: squads.length + 1,
-  deck_name: deck.deck_name || `${squads.length + 1}군 추천 부대`,
-  formationGrid: initialNamedGrid, // 👈 장수 이름 배열로 바로 전달
-  formationInfo: formationInfo,
-  setup: squadSetup
-});
+      squads.push({
+        id: deck.id || i,
+        squadNum: squads.length + 1,
+        deck_name: deck.deck_name || `${squads.length + 1}군 추천 부대`,
+        formationGrid: initialNamedGrid, 
+        formationInfo: formationInfo,
+        setup: squadSetup
+      });
     }
 
     setRecommendedSquads(squads);
+    setNeedMoreGenerals(hasEmptySlot || squads.length < 5);
   }, [isLoading, tierDecks, generals, tactics, selectedGenerals, selectedTactics]);
 
-  // 💡 전법 모달용 데이터 정렬 연산
   const assignedTacticsMap = getAssignedTacticsMap(recommendedSquads);
 
   const sortedTacticsForModal = (() => {
@@ -729,11 +785,13 @@ squads.push({
     );
   }
 
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+
   return (
     <PageLayout>
       <div style={{ padding: '25px', minHeight: '100vh' }}>
         
-        {/* 📌 상단 탭 내비게이션 (다른 주요 페이지와 동일한 스킬/탭 적용) */}
         <nav className="classic-tabbar" style={{ marginBottom: '35px' }}>
           <Link href="/?tab=my-assets" className="classic-tab">
             나의 보유 현황
@@ -750,404 +808,566 @@ squads.push({
           <Link href="/vs" className="classic-tab">⚔️ 모의 대결</Link>
         </nav>
 
-      {/* 💡 상단 컨트롤바 (이미지 저장 버튼) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 className="classic-heading text-3xl font-bold">⚔️ 1-5군 최적 추천 & 수동 편성</h1>
-        
-        <button
-          onClick={handleDownloadImage}
-          style={{
-            backgroundColor: 'var(--seal)',
-            color: '#fff',
-            padding: '10px 18px',
-            border: '2px solid var(--gold)',
-            borderRadius: '6px',
-            fontWeight: 'bold',
-            fontSize: '0.95rem',
-            cursor: 'pointer',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          📜 출정칙서 이미지 저장
-        </button>
-
-        <button
-    onClick={handleSaveSquads}
-    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition-colors flex items-center gap-2"
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M7.707 10.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6a1 1 0 10-2 0v5.586l-1.293-1.293z" />
-      <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v2a1 1 0 11-2 0V4H7v2a1 1 0 11-2 0V4z" />
-      <path d="M3 9a2 2 0 012-2h1a1 1 0 110 2H5v7h10V9h-1a1 1 0 110-2h1a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-    </svg>
-    부대 편성 저장하기
-  </button>
-
-      </div>
-
-      {/* 📜 [캡처 대상 영역] 출정칙서 전체 컨테이너 */}
-      <div 
-        ref={exportRef} 
-        style={{ 
-          padding: '30px', 
-          backgroundColor: 'var(--paper)', // 한지 질감 배경
-          border: '3px double var(--gold)', 
-          borderRadius: '8px',
-          position: 'relative'
-        }}
-      >
-        {/* 🏮 칙서 헤더 및 붉은 인장(도장) 영역 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--gold)', paddingBottom: '20px', marginBottom: '25px' }}>
-          <div>
-            <span style={{ fontSize: '0.9rem', color: 'var(--seal-dark)', fontWeight: 'bold', letterSpacing: '2px' }}>
-              【 𝟤𝟢𝟤𝟨 𝖲𝖨𝖭𝖦𝖮𝖪𝖴𝖲𝖧𝖨 𝖢𝖮𝖬𝖬𝖠𝖭𝖣 】
-            </span>
-            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--ink-text)', marginTop: '4px' }}>
-              천하평정 5개 군단 출정칙서 (出征勅書)
-            </h2>
+        {needMoreGenerals && (
+          <div style={{ color: '#a81c1c', fontWeight: 'bold', marginBottom: '10px' }}>
+            ⚠️ 5군덱까지 완성하려면 장수가 더 필요합니다.
           </div>
+        )}
 
-          {/* 💮 꼬마맹 & 유저 닉네임 붉은 도장(낙관) UI */}
-<div style={{
-  border: '3px solid #a81c1c',
-  color: '#a81c1c',
-  padding: '8px 14px',
-  borderRadius: '6px',
-  fontWeight: 'bold',
-  textAlign: 'center',
-  backgroundColor: 'rgba(168, 28, 28, 0.05)',
-  boxShadow: 'inset 0 0 4px rgba(168, 28, 28, 0.2)',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  transform: 'rotate(-3deg)'
-}}>
-  <div style={{ fontSize: '12px', borderBottom: '1px solid #a81c1c', paddingBottom: '2px', letterSpacing: '1px' }}>
-    꼬마맹
-  </div>
-  <div style={{ fontSize: '18px', fontWeight: 'bold', marginTop: '4px' }}>
-    {userNickname} 印
-  </div>
-</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h1 className="classic-heading text-3xl font-bold">⚔️ 1-5군 최적 추천 & 수동 편성</h1>
+          
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={handleSaveSquads}
+              className="px-3 py-1.5 bg-[#3f0f0f] hover:bg-[#591616] text-amber-100 font-semibold rounded border border-[#7f1d1d] shadow-md transition-colors flex items-center gap-1.5"
+              style={{ fontSize: '0.85rem' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M7.707 10.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6a1 1 0 10-2 0v5.586l-1.293-1.293z" />
+                <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v2a1 1 0 11-2 0V4H7v2a1 1 0 11-2 0V4z" />
+                <path d="M3 9a2 2 0 012-2h1a1 1 0 110 2H5v7h10V9h-1a1 1 0 110-2h1a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              </svg>
+              편성 저장
+            </button>
+
+            <button
+              onClick={handleDownloadImage}
+              style={{
+                backgroundColor: SCROLL.seal,
+                color: '#fdf6e3',
+                padding: '6px 12px',
+                border: `2px solid ${SCROLL.gold}`,
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              📜 칙서 발행 (이미지 저장)
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-          {recommendedSquads.map(squad => {
-            const currentHeroNames = squad.setup.map(h => h.general_name);
-            const activeSynergies = getActiveSynergies(currentHeroNames);
-            const activeConnections = getActiveConnections(currentHeroNames);
-            const formationInfo = getMatchedFormation(squad.formationGrid?.join(','), formations);
+        {/* ============================================================
+            📜 [캡처 영역] 출정칙서 — 양피지 한 장 전체
+        ============================================================ */}
+        <div
+          ref={exportRef}
+          style={{
+            position: 'relative',
+            background: `linear-gradient(180deg, ${SCROLL.paperLight} 0%, ${SCROLL.paperMid} 45%, ${SCROLL.paperLight} 100%)`,
+            border: `3px double ${SCROLL.border}`,
+            borderRadius: '6px',
+            padding: '44px 48px',
+            boxShadow: '0 10px 34px rgba(58,42,26,0.35), inset 0 0 90px rgba(139,94,52,0.12)',
+            color: SCROLL.ink,
+            fontFamily: '"Noto Serif KR", ui-serif, Georgia, serif',
+            overflow: 'hidden'
+          }}
+        >
+          {/* 종이결 텍스처 (은은한 얼룩) */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            backgroundImage: `radial-gradient(circle at 15% 20%, ${SCROLL.paperTexture} 0, transparent 35%),
+                               radial-gradient(circle at 85% 15%, ${SCROLL.paperTexture} 0, transparent 30%),
+                               radial-gradient(circle at 75% 85%, ${SCROLL.paperTexture} 0, transparent 35%),
+                               radial-gradient(circle at 25% 90%, ${SCROLL.paperTexture} 0, transparent 30%)`
+          }} />
+          {/* 얇은 이중 테두리 (족자 느낌) */}
+          <div style={{
+            position: 'absolute', inset: '10px', border: `1px solid ${SCROLL.borderSoft}`,
+            borderRadius: '3px', pointerEvents: 'none'
+          }} />
 
-            return (
-              <div key={squad.id} className="scroll-panel" style={{ padding: '24px', border: '1px solid var(--gold)', marginBottom: '25px', backgroundColor: 'var(--paper-soft)' }}>
-                
-                {/* 군단 헤더 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--gold)', paddingBottom: '10px', marginBottom: '15px' }}>
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>
-                    [{squad.squadNum}군] {generateSquadName(squad.setup, squad.deck_name)}
-                  </h2>
-                </div>
+          {/* ---------------- 머리말: 세로 제목 + 직인 ---------------- */}
+          <div style={{
+            position: 'relative', zIndex: 1,
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            borderBottom: `2px solid ${SCROLL.border}`, paddingBottom: '22px', marginBottom: '30px'
+          }}>
+            {/* 세로 제목 */}
+            <div style={{
+              writingMode: 'vertical-rl', textOrientation: 'upright',
+              fontSize: '1.6rem', fontWeight: 900, letterSpacing: '0.2em',
+              color: SCROLL.sealDark, flexShrink: 0, marginRight: '20px', lineHeight: 1.3
+            }}>
+              出征勅書
+            </div>
 
-                {/* 🛡️ 통합 군진 UI 영역 */}
-                <div style={{ 
-                  marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                  backgroundColor: 'var(--paper)', padding: '12px 16px', border: '1px solid rgba(184,147,90,0.3)', borderRadius: '6px' 
+            {/* 중앙 제목 & 설명 */}
+            <div style={{ flex: 1, textAlign: 'center', paddingTop: '6px' }}>
+              <h2 style={{ fontSize: '1.55rem', fontWeight: 900, letterSpacing: '0.08em', margin: 0 }}>
+                천하평정 출정칙서
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: SCROLL.inkSoft, marginTop: '10px', lineHeight: 1.6 }}>
+                {userNickname} 님의 보유 장수와 전법을 헤아려 아래와 같이 一軍부터 五軍까지의<br />
+                출진을 명하니, 각 군은 정한 진형과 배치를 따라 천하를 평정하라.
+              </p>
+              <p style={{ fontSize: '0.75rem', color: SCROLL.inkFaint, marginTop: '8px' }}>
+                반포일 · {dateStr}
+              </p>
+            </div>
+
+            {/* 낙관형 직인 */}
+            <div style={{ flexShrink: 0, marginLeft: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{
+                width: '76px', height: '76px',
+                border: `3px solid ${SCROLL.seal}`,
+                borderRadius: '4px',
+                backgroundColor: 'rgba(168,41,31,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transform: 'rotate(-3deg)',
+                boxShadow: '0 2px 6px rgba(124,29,22,0.25)'
+              }}>
+                <span style={{
+                  writingMode: 'vertical-rl', textOrientation: 'upright',
+                  fontSize: '1rem', fontWeight: 900, color: SCROLL.seal, letterSpacing: '0.1em'
                 }}>
-                  <div style={{ flex: 1, marginRight: '15px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                      <span style={{ backgroundColor: 'var(--seal)', padding: '4px 10px', color: '#fff', fontWeight: 'bold', fontSize: '0.85rem', borderRadius: '4px' }}>
-                        군진 선택
-                      </span>
+                  {userNickname || '맹원'}印
+                </span>
+              </div>
+              <span style={{ fontSize: '0.68rem', color: SCROLL.inkFaint, marginTop: '6px' }}>발행인 직인</span>
+            </div>
+          </div>
 
-                      {/* 진형 드롭다운 */}
-                      <select
-                        value={formationInfo.id || ''}
-                        onChange={(e) => handleFormationChange(squad.id, e.target.value)}
-                        style={{ padding: '4px 8px', fontWeight: 'bold', border: '1px solid var(--gold)', borderRadius: '4px', backgroundColor: '#fff' }}
-                      >
-                        {formations.map(f => {
-                          const fitScore = evaluateFormationFit(squad.setup, f, generals);
-                          return (
-                            <option key={f.id} value={f.id}>
-                              {f.name} (적합도: {fitScore}점)
-                            </option>
-                          );
-                        })}
-                      </select>
+          {/* ---------------- 조항 (1~5군) ---------------- */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {recommendedSquads.map((squad, index) => {
+              const currentHeroNames = squad.setup.map(h => h.general_name);
+              const activeSynergies = getActiveSynergies(currentHeroNames);
+              const activeConnections = getActiveConnections(currentHeroNames);
+              const formationInfo = squad.formationInfo || getMatchedFormation(squad.formationGrid?.join(','), formations);
+              const activeTroopFactionBonuses = getActiveTroopFactionBonuses(currentHeroNames, generals);
 
-                      {/* 적합도 뱃지 */}
-                      <span style={{ backgroundColor: 'rgba(63,93,84,0.15)', color: 'var(--jade)', padding: '4px 10px', borderRadius: '4px', fontWeight: '900', fontSize: '0.85rem' }}>
-                        추천 적합도: {evaluateFormationFit(squad.setup, formationInfo, generals)}점
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '0.88rem', color: 'var(--ink-text)', marginTop: '4px' }}>
-                      <strong>효과:</strong> {formationInfo.effect}
-                    </div>
+              return (
+                <section
+                  key={squad.id || index}
+                  style={{
+                    marginBottom: '30px',
+                    paddingBottom: '28px',
+                    borderBottom: index < recommendedSquads.length - 1 ? `1px dashed ${SCROLL.borderSoft}` : 'none'
+                  }}
+                >
+                  {/* 조항 제목 */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '14px' }}>
+                    <span style={{
+                      fontSize: '1.1rem', fontWeight: 900, color: SCROLL.seal,
+                      fontFamily: 'ui-serif, Georgia, serif'
+                    }}>
+                      第{HANJA_NUM[index] || index + 1}條
+                    </span>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: SCROLL.ink }}>
+                      {squad.id || index + 1}군 — {squad.deck_name || `${index + 1}군 추천 부대`}
+                    </h3>
                   </div>
 
-                  {/* 💡 각 부대의 formationGrid와 squad.id를 전달 */}
-<FormationGridVisual 
-  gridData={squad.formationGrid || calculateAutoFormationGrid(squad.setup, generals)} 
-  onCellClick={(clickedIdx) => handleGridCellClick(squad.id, clickedIdx)} 
-/>
-                </div>
+                  {/* 진형 정보 */}
+                  <div style={{
+                    marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    backgroundColor: 'rgba(139,94,52,0.08)', padding: '12px 16px',
+                    border: `1px solid ${SCROLL.borderSoft}`, borderRadius: '4px'
+                  }}>
+                    <div style={{ flex: 1, marginRight: '15px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        <span style={{
+                          backgroundColor: SCROLL.seal, padding: '4px 10px', color: '#fdf6e3',
+                          fontWeight: 'bold', fontSize: '0.85rem', borderRadius: '3px'
+                        }}>
+                          진형
+                        </span>
 
-                {/* 🔗 인연 및 ⚡ 관계 뱃지 영역 */}
-                {(activeSynergies.length > 0 || activeConnections.length > 0) && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', padding: '12px', backgroundColor: 'rgba(0,0,0,0.03)', border: '1px solid rgba(184,147,90,0.2)', borderRadius: '6px' }}>
-                    {activeSynergies.map((syn, synIdx) => (
-                      <div key={`syn-${synIdx}`} style={{ fontSize: '0.88rem', color: 'var(--seal-dark)' }}>
-                        🔗 [인연] <strong>{syn.name}</strong> ({syn.req_count}인): {syn.effect}
-                      </div>
-                    ))}
+                        <select
+                          value={formationInfo.id || ''}
+                          onChange={(e) => handleFormationChange(squad.id, e.target.value)}
+                          style={{
+                            padding: '4px 8px', fontWeight: 'bold', border: `1px solid ${SCROLL.border}`,
+                            borderRadius: '4px', backgroundColor: SCROLL.paperLight, color: SCROLL.ink
+                          }}
+                        >
+                          {formations.map(f => {
+                            const fitScore = evaluateFormationFit(squad.setup, f, generals);
+                            return (
+                              <option key={f.id} value={f.id} style={{ backgroundColor: SCROLL.paperLight, color: SCROLL.ink }}>
+                                {f.name} (적합도: {fitScore}점)
+                              </option>
+                            );
+                          })}
+                        </select>
 
-                    {activeConnections.map((conn, connIdx) => (
-                      <div key={`conn-${connIdx}`} style={{ fontSize: '0.88rem', color: 'var(--jade)', backgroundColor: 'rgba(63,93,84,0.08)', padding: '6px 10px', borderRadius: '4px' }}>
-                        ⚡ [연의 관계] <strong>{conn.leader_name} → {conn.follower_name}</strong> | 
-                        제공: <em>{conn.provides}</em> | 
-                        효과: <strong>{conn.follower_effect}</strong>
+                        <span style={{
+                          backgroundColor: 'rgba(163,120,46,0.18)', color: SCROLL.gold,
+                          border: `1px solid ${SCROLL.gold}`, padding: '4px 10px', borderRadius: '4px',
+                          fontWeight: '900', fontSize: '0.85rem'
+                        }}>
+                          적합도 {evaluateFormationFit(squad.setup, formationInfo, generals)}점
+                        </span>
                       </div>
-                    ))}
+
+                      <div style={{ fontSize: '0.88rem', color: SCROLL.inkSoft, marginTop: '4px' }}>
+                        <strong style={{ color: SCROLL.seal }}>효과:</strong> {formationInfo.effect}
+                      </div>
+                    </div>
+
+                    <FormationGridVisual
+                      gridData={squad.formationGrid || calculateAutoFormationGrid(squad.setup, generals)}
+                      onCellClick={(clickedIdx) => handleGridCellClick(squad.id, clickedIdx)}
+                    />
                   </div>
-                )}
 
-                {/* 3인 장수 슬롯 및 직접 선택 UI */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
-                  {squad.setup.map((hero, hIdx) => {
-                    const otherHeroNamesInSquad = squad.setup
-                      .filter((_, idx) => idx !== hIdx)
-                      .map(h => h.general_name);
+                  {/* 인연/연의/조합 효과 */}
+                  {(activeSynergies.length > 0 || activeConnections.length > 0 || activeTroopFactionBonuses.length > 0) && (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', padding: '12px',
+                      backgroundColor: 'rgba(139,94,52,0.05)', border: `1px solid ${SCROLL.borderSoft}`, borderRadius: '4px'
+                    }}>
+                      <div style={{
+                        fontSize: '0.75rem', color: SCROLL.inkFaint, borderBottom: `1px dashed ${SCROLL.borderSoft}`,
+                        paddingBottom: '6px', marginBottom: '2px'
+                      }}>
+                        ℹ️ 연의 효과는 인게임 공식 데이터가 아니며, 천하결전 카페 패밀리맨74님이 제안하신 커뮤니티 해석 자료를 반영한 것입니다.
+                      </div>
 
-                    const currentGen = generals.find(g => g.name === hero.general_name);
+                      {activeSynergies.map((syn, synIdx) => (
+                        <div key={`syn-${synIdx}`} style={{ fontSize: '0.88rem', color: SCROLL.sealDark }}>
+                          🔗 [인연] <strong>{syn.name}</strong> ({syn.req_count}인): {syn.effect}
+                        </div>
+                      ))}
 
-                    return (
-                      <div key={hIdx} style={{ padding: '16px', border: '1px solid var(--gold)', backgroundColor: 'var(--paper-soft)' }}>
-                        
-                        {/* 🖼️ 장수 초상화 & 드롭다운 셀 */}
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-                          <div style={{ width: '52px', height: '52px', border: '2px solid var(--gold)', flexShrink: 0, overflow: 'hidden' }}>
-                            <img 
-                              src={hero.image_url || '/images/generals/default.jpg'} 
-                              alt={hero.general_name} 
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              onError={(e) => { e.target.src = '/images/generals/default.jpg'; }}
-                            />
+                      {activeConnections.map((conn, connIdx) => (
+                        <div key={`conn-${connIdx}`} style={{
+                          fontSize: '0.88rem', color: '#2f5c2f', backgroundColor: 'rgba(47,92,47,0.08)',
+                          padding: '6px 10px', borderRadius: '4px', border: '1px solid rgba(47,92,47,0.25)'
+                        }}>
+                          ⚡ [연의 관계] <strong>{conn.leader_name} → {conn.follower_name}</strong> |
+                          제공: <em>{conn.provides}</em> |
+                          효과: <strong>{conn.follower_effect}</strong>
+                        </div>
+                      ))}
+
+                      {activeTroopFactionBonuses.map((bonus, bIdx) => (
+                        <div key={`troop-${bIdx}`} style={{
+                          fontSize: '0.88rem', color: SCROLL.gold, backgroundColor: 'rgba(163,120,46,0.1)',
+                          border: `1px solid ${SCROLL.gold}`, padding: '6px 10px', borderRadius: '4px', fontWeight: 'bold'
+                        }}>
+                          🛡️ [조합] <strong>{bonus.label}</strong>: {bonus.effect}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 장수 슬롯 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                    {squad.setup.map((hero, hIdx) => {
+                      const otherHeroNamesInSquad = squad.setup
+                        .filter((_, idx) => idx !== hIdx)
+                        .map(h => h.general_name);
+
+                      const otherHeroGenObjs = otherHeroNamesInSquad
+                        .map(name => generals.find(g => g.name === name))
+                        .filter(Boolean);
+
+                      // 진영 배경/테두리 — 양피지 톤에 맞춘 은은한 색
+                      const FACTION_COLORS = {
+                        '위': 'rgba(51,73,110,0.08)',
+                        '촉': 'rgba(45,90,55,0.08)',
+                        '오': 'rgba(139,41,31,0.08)',
+                        '군': 'rgba(163,120,46,0.1)',
+                      };
+
+                      const FACTION_BORDER_COLORS = {
+                        '위': '#33496e',
+                        '촉': '#2d5a37',
+                        '오': SCROLL.seal,
+                        '군': SCROLL.gold,
+                      };
+
+                      const ROLE_LABEL_MAP = {
+                        '방어_자신': '탱커', '방어_아군': '탱커',
+                        '딜_병기': '딜러', '딜_책략': '딜러', '딜_혼합': '딜러',
+                        '추격': '딜러(추격)', '액티브': '딜러(액티브)', '회심': '딜러(회심)',
+                        '힐': '힐러',
+                        '버프_자신': '버퍼', '버프_아군': '버퍼', '지원_복합': '버퍼',
+                        '디버프': '디버퍼',
+                      };
+
+                      const ROLE_GROUP_MAP = {
+                        '방어_자신': '탱', '방어_아군': '탱',
+                        '딜_병기': '딜', '딜_책략': '딜', '딜_혼합': '딜', '추격': '딜', '액티브': '딜', '회심': '딜',
+                        '힐': '힐',
+                        '버프_자신': '버프', '버프_아군': '버프', '지원_복합': '버프',
+                        '디버프': '디버프',
+                      };
+
+                      const currentGen = generals.find(g => g.name === hero.general_name);
+
+                      return (
+                        <div key={hIdx} style={{
+                          padding: '16px',
+                          border: `1.5px solid ${FACTION_BORDER_COLORS[currentGen?.faction] || SCROLL.border}`,
+                          backgroundColor: FACTION_COLORS[currentGen?.faction] || 'rgba(139,94,52,0.05)',
+                          borderRadius: '6px'
+                        }}>
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                            <div style={{ width: '52px', height: '52px', border: `2px solid ${SCROLL.gold}`, borderRadius: '4px', flexShrink: 0, overflow: 'hidden' }}>
+                              <img
+                                src={hero.image_url || '/images/generals/default.jpg'}
+                                alt={hero.general_name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => { e.target.src = '/images/generals/default.jpg'; }}
+                              />
+                            </div>
+
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <select
+                                value={hero.general_name}
+                                onChange={(e) => handleGeneralChange(squad.id, hIdx, e.target.value)}
+                                style={{
+                                  width: '100%', padding: '6px 8px', fontWeight: 'bold', fontSize: '0.95rem',
+                                  border: `1px solid ${SCROLL.border}`, borderRadius: '4px',
+                                  backgroundColor: SCROLL.paperLight, color: SCROLL.ink, cursor: 'pointer'
+                                }}
+                              >
+                                {generals
+                                  .filter(g => selectedGenerals.includes(g.id))
+                                  .filter(g => !otherHeroNamesInSquad.includes(g.name))
+                                  .sort((a, b) => {
+                                    const scoreOf = (g) => {
+                                      let s = 0;
+                                      if (otherHeroGenObjs.some(o => o.faction === g.faction)) s += 2;
+                                      if (otherHeroGenObjs.some(o => o.troop_type === g.troop_type)) s += 1;
+
+                                      const candidateRole = ROLE_GROUP_MAP[g.preferred_tactic_type];
+                                      const existingRoles = otherHeroGenObjs.map(o => ROLE_GROUP_MAP[o.preferred_tactic_type]).filter(Boolean);
+
+                                      if (existingRoles.includes('탱') && ['딜', '힐', '디버프'].includes(candidateRole)) s += 3;
+                                      if (candidateRole && !existingRoles.includes(candidateRole)) s += 1;
+
+                                      return s;
+                                    };
+
+                                    return scoreOf(b) - scoreOf(a);
+                                  })
+                                  .map(g => {
+                                    const connBadge = getGeneralConnectionBadge(g.name, connections);
+                                    const roleBadge = g.preferred_tactic_type
+                                      ? ` [${ROLE_LABEL_MAP[g.preferred_tactic_type] || g.preferred_tactic_type}]`
+                                      : '';
+                                    const posBadge = g.position ? ` [${g.position}]` : '';
+                                    const troopBadge = g.troop_type ? ` [${g.troop_type}]` : '';
+                                    const isSynergyTarget = checkHasConnectionWithSquad(g.name, otherHeroNamesInSquad, connections);
+                                    const isFactionMatch = otherHeroGenObjs.some(o => o.faction === g.faction);
+
+                                    return (
+                                      <option
+                                        key={g.id}
+                                        value={g.name}
+                                        style={{
+                                          backgroundColor: SCROLL.paperLight,
+                                          fontWeight: (isSynergyTarget || isFactionMatch) ? 'bold' : 'normal',
+                                          color: isSynergyTarget
+                                            ? SCROLL.seal
+                                            : isFactionMatch
+                                            ? SCROLL.sealDark
+                                            : SCROLL.ink
+                                        }}
+                                      >
+                                        {g.name}{roleBadge}{posBadge}{troopBadge} {g.kingdom ? `(${g.kingdom})` : ''} {connBadge} {isSynergyTarget ? '⚡' : ''}
+                                      </option>
+                                    );
+                                  })}
+                              </select>
+
+                              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {currentGen?.position && (
+                                  <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: SCROLL.seal, fontWeight: 'bold' }}>🚩 추천 위치:</span>
+                                    <span style={{
+                                      backgroundColor: currentGen.position === '전열' ? 'rgba(139,41,31,0.12)' : 'rgba(51,73,110,0.12)',
+                                      color: currentGen.position === '전열' ? SCROLL.seal : '#33496e',
+                                      border: `1px solid ${currentGen.position === '전열' ? SCROLL.seal : '#33496e'}`,
+                                      padding: '1px 7px', borderRadius: '4px', fontWeight: '800'
+                                    }}>
+                                      {currentGen.position}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {currentGen?.main_stat && (
+                                  <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: SCROLL.gold, fontWeight: 'bold' }}>✨ 추천 속성:</span>
+                                    <span style={{ backgroundColor: 'rgba(163,120,46,0.12)', color: SCROLL.gold, border: `1px solid ${SCROLL.gold}`, padding: '1px 7px', borderRadius: '4px', fontWeight: '800' }}>
+                                      {currentGen.main_stat}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {currentGen?.troop_type && (
+                                  <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: '#a05a1e', fontWeight: 'bold' }}>⚔️ 병종:</span>
+                                    <span style={{ backgroundColor: 'rgba(160,90,30,0.12)', color: '#a05a1e', border: '1px solid rgba(160,90,30,0.4)', padding: '1px 7px', borderRadius: '4px', fontWeight: '800' }}>
+                                      {currentGen.troop_type}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {currentGen?.recommended_equip_stats && (
+                                  <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: '#2d5a37', fontWeight: 'bold' }}>🛡️ 장비 가이드:</span>
+                                    <span style={{ backgroundColor: 'rgba(45,90,55,0.1)', color: '#2d5a37', border: '1px solid rgba(45,90,55,0.4)', padding: '1px 7px', borderRadius: '4px', fontWeight: '800' }}>
+                                      {currentGen.recommended_equip_stats}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
 
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <select
-                              value={hero.general_name}
-                              onChange={(e) => handleGeneralChange(squad.id, hIdx, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '4px 6px',
-                                fontWeight: 'bold',
-                                fontSize: '0.95rem',
-                                border: '1px solid var(--gold)',
-                                backgroundColor: 'var(--paper)',
-                                color: 'var(--ink-text)'
-                              }}
-                            >
-                              {generals.map(g => {
-                                const connBadge = getGeneralConnectionBadge(g.name, connections);
-                                const mainStatBadge = g.main_stat ? ` [${g.main_stat}]` : '';
-                                const posBadge = g.position ? ` [${g.position}]` : '';
-                                const isSynergyTarget = checkHasConnectionWithSquad(g.name, otherHeroNamesInSquad, connections);
-
-                                return (
-                                  <option 
-                                    key={g.id} 
-                                    value={g.name}
-                                    style={{
-                                      backgroundColor: isSynergyTarget ? 'rgba(184, 147, 90, 0.25)' : undefined,
-                                      fontWeight: isSynergyTarget ? 'bold' : 'normal',
-                                      color: isSynergyTarget ? 'var(--seal-dark)' : undefined
-                                    }}
-                                  >
-                                    {isSynergyTarget ? '⚡ [연의 추천] ' : ''}
-                                    {connBadge}{g.name}{mainStatBadge}{posBadge} {g.kingdom ? `(${g.kingdom})` : ''}
-                                  </option>
-                                );
-                              })}
-                            </select>
-
-                            {/* 💡 추천 위치 & 속성 & 장비 가이드 뱃지 */}
-                            <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              
-                              {/* 🚩 배치 위치 뱃지 (전열/후열) */}
-                              {currentGen?.position && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--ink-text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span style={{ color: 'var(--seal-dark)', fontWeight: 'bold' }}>🚩 추천 위치:</span>
-                                  <span style={{ 
-                                    backgroundColor: currentGen.position === '전열' 
-                                      ? 'rgba(168, 28, 28, 0.12)' 
-                                      : currentGen.position === '후열' 
-                                      ? 'rgba(41, 98, 255, 0.12)' 
-                                      : 'rgba(100, 100, 100, 0.12)', 
-                                    color: currentGen.position === '전열' 
-                                      ? '#a81c1c' 
-                                      : currentGen.position === '후열' 
-                                      ? '#1565c0' 
-                                      : '#444',
-                                    padding: '1px 6px', 
-                                    borderRadius: '3px', 
-                                    fontWeight: 'bold' 
-                                  }}>
-                                    {currentGen.position}
+                          <div style={{ borderTop: `1px solid ${SCROLL.borderSoft}`, paddingTop: '10px', marginTop: '6px' }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: '800', marginBottom: '8px', color: SCROLL.seal, letterSpacing: '0.05em' }}>
+                              ⚔️ 장착 전법 (클릭 교체)
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {hero.tactics.map((t, tIdx) => (
+                                <div
+                                  key={tIdx}
+                                  onClick={() => setEditingTacticTarget({
+                                    squadId: squad.id,
+                                    heroIndex: hIdx,
+                                    tacticIndex: tIdx,
+                                    currentHeroName: hero.general_name
+                                  })}
+                                  style={{
+                                    cursor: 'pointer', padding: '7px 10px', borderRadius: '4px',
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    border: t.isManual ? `1px solid ${SCROLL.gold}` : `1px solid ${SCROLL.borderSoft}`,
+                                    backgroundColor: t.isManual ? 'rgba(163,120,46,0.12)' : 'rgba(139,94,52,0.04)',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                  }}
+                                  title="클릭 시 적합도 점수순 선택창 표시"
+                                >
+                                  <span style={{ fontSize: '0.85rem', fontWeight: '600', color: SCROLL.ink }}>
+                                    {t.name} {t.isManual && <span style={{ fontSize: '0.7rem', color: SCROLL.gold }}>(수동)</span>}
+                                  </span>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: '800', color: SCROLL.seal, backgroundColor: 'rgba(168,41,31,0.1)', padding: '2px 6px', borderRadius: '4px', border: `1px solid rgba(168,41,31,0.3)` }}>
+                                    {t.score}점 ✏️
                                   </span>
                                 </div>
-                              )}
-
-                              {currentGen?.main_stat && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--ink-text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span style={{ color: 'var(--seal-dark)', fontWeight: 'bold' }}>✨ 추천 속성:</span>
-                                  <span style={{ backgroundColor: 'rgba(184,147,90,0.15)', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>
-                                    {currentGen.main_stat}
-                                  </span>
-                                </div>
-                              )}
-
-                              {currentGen?.recommended_equip_stats && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--ink-text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span style={{ color: 'var(--jade)', fontWeight: 'bold' }}>🛡️ 장비 가이드:</span>
-                                  <span style={{ backgroundColor: 'rgba(63,93,84,0.12)', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>
-                                    {currentGen.recommended_equip_stats}
-                                  </span>
-                                </div>
-                              )}
+                              ))}
                             </div>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
 
-                        {/* ⚔️ 전법 셀 클릭 영역 */}
-                        <div style={{ borderTop: '1px dashed rgba(184,147,90,0.4)', paddingTop: '10px' }}>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
-                            장착 전법 (클릭하여 교체)
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {hero.tactics.map((t, tIdx) => (
-                              <div 
-                                key={tIdx} 
-                                onClick={() => setEditingTacticTarget({ 
-                                  squadId: squad.id, 
-                                  heroIndex: hIdx, 
-                                  tacticIndex: tIdx,
-                                  currentHeroName: hero.general_name 
-                                })}
-                                style={{ 
-                                  cursor: 'pointer', padding: '6px 10px', borderRadius: '4px',
-                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                  border: t.isManual ? '2px solid var(--gold)' : '1px dashed var(--gold)',
-                                  backgroundColor: t.isManual ? 'rgba(184,147,90,0.18)' : 'var(--paper)'
-                                }}
-                                title="클릭 시 적합도 점수순 선택창 표시"
-                              >
-                                <span style={{ fontSize: '0.88rem', fontWeight: 'bold' }}>
-                                  {t.name} {t.isManual && '(수동선택)'}
-                                </span>
-                                <span style={{ fontSize: '0.82rem', fontWeight: '900', color: 'var(--jade)' }}>
-                                  {t.score}점 ✏️
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                      </div>
-                    );
-                  })}
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
-
-        {/* 💡 전법 선택 모달 */}
-        {editingTacticTarget && (
-          <div style={{ 
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-            backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', 
-            justifyContent: 'center', alignItems: 'center', zIndex: 1000 
+          {/* ---------------- 하단 낙관 (반포 확인) ---------------- */}
+          <div style={{
+            position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'flex-end',
+            alignItems: 'center', gap: '14px', marginTop: '10px', paddingTop: '18px',
+            borderTop: `1px solid ${SCROLL.borderSoft}`
           }}>
-            <div style={{ 
-              backgroundColor: 'var(--paper)', padding: '24px', maxWidth: '560px', 
-              width: '90%', maxHeight: '80vh', overflowY: 'auto', 
-              border: '2px solid var(--gold)', boxShadow: '0 0 20px rgba(0,0,0,0.5)' 
+            <span style={{ fontSize: '0.8rem', color: SCROLL.inkFaint }}>
+              본 칙서는 {userNickname} 님의 명의로 반포됨
+            </span>
+            <div style={{
+              width: '44px', height: '44px', border: `2px solid ${SCROLL.seal}`, borderRadius: '4px',
+              backgroundColor: 'rgba(168,41,31,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transform: 'rotate(4deg)'
             }}>
-              
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '4px', color: 'var(--ink-text)' }}>
-                ⚔️ [{editingTacticTarget.currentHeroName}] 전법 선택 및 대체 추천
-              </h3>
-              <p style={{ fontSize: '0.82rem', color: 'gray', marginBottom: '16px' }}>
-                * 다른 군단 장수가 이미 장착한 전법은 선택이 제한될 수 있습니다.
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {sortedTacticsForModal.map(tac => (
-                  <button
-                    key={tac.id}
-                    disabled={tac.isOccupied}
-                    onClick={() => handleTacticChange(tac.name)}
-                    style={{
-                      padding: '10px 14px',
-                      border: tac.isOccupied ? '1px solid #ddd' : tac.isRec ? '2px solid var(--gold)' : '1px solid #ccc',
-                      backgroundColor: tac.isOccupied ? '#f0f0f0' : tac.isRec ? 'rgba(184,147,90,0.15)' : tac.isAlternative ? 'rgba(63,93,84,0.08)' : 'var(--paper-soft)',
-                      opacity: tac.isOccupied ? 0.55 : 1,
-                      cursor: tac.isOccupied ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <div>
-                      <span style={{ fontWeight: 'bold', fontSize: '0.95rem', color: tac.isOccupied ? '#777' : 'var(--ink-text)' }}>
-                        {tac.isRec && '⭐ '}
-                        {tac.isAlternative && '🔄 '}
-                        {tac.name}
-                      </span>
-
-                      <span style={{ fontSize: '0.75rem', marginLeft: '8px' }}>
-                        {tac.isOccupied ? (
-                          <strong style={{ color: 'var(--seal)' }}>[{tac.assignedInfo.squadNum}군 {tac.assignedInfo.generalName} 착용 중]</strong>
-                        ) : tac.isRec ? (
-                          <span style={{ color: 'var(--seal-dark)' }}>[공식 추천]</span>
-                        ) : tac.isAlternative ? (
-                          <span style={{ color: 'var(--jade)' }}>[대체 메커니즘 전법]</span>
-                        ) : (
-                          <span style={{ color: 'gray' }}>{tac.isOwned ? '[보유]' : '[미보유]'}</span>
-                        )}
-                      </span>
-                    </div>
-
-                    <span style={{ fontWeight: '900', color: tac.isOccupied ? '#999' : 'var(--seal-dark)', fontSize: '0.95rem' }}>
-                      {tac.score}점
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <button 
-                onClick={() => setEditingTacticTarget(null)}
-                style={{ 
-                  marginTop: '18px', width: '100%', padding: '10px', 
-                  backgroundColor: 'var(--seal)', color: '#fff', border: 'none', 
-                  fontWeight: 'bold', cursor: 'pointer' 
-                }}
-              >
-                닫기
-              </button>
+              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: SCROLL.seal }}>畢</span>
             </div>
           </div>
-        )}
+
+          {/* 💡 전법 선택 모달 */}
+          {editingTacticTarget && (
+            <div onClick={() => setEditingTacticTarget(null)}
+              style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(58,42,26,0.55)', display: 'flex',
+                justifyContent: 'center', alignItems: 'center', zIndex: 1000,
+                backdropFilter: 'blur(4px)'
+              }}>
+              <div onClick={(e) => e.stopPropagation()} style={{
+                backgroundColor: SCROLL.paperLight, padding: '24px', maxWidth: '560px',
+                width: '90%', maxHeight: '80vh', overflowY: 'auto',
+                border: `2px solid ${SCROLL.border}`, borderRadius: '10px', boxShadow: '0 0 25px rgba(58,42,26,0.5)',
+                color: SCROLL.ink, fontFamily: '"Noto Serif KR", ui-serif, Georgia, serif'
+              }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '4px', color: SCROLL.seal }}>
+                  ⚔️ [{editingTacticTarget.currentHeroName}] 전법 선택 및 대체 추천
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: SCROLL.inkFaint, marginBottom: '16px' }}>
+                  * 다른 군단 장수가 이미 장착한 전법은 선택이 제한될 수 있습니다.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {sortedTacticsForModal.map(tac => (
+                    <button
+                      key={tac.id}
+                      disabled={!tac.isOwned || tac.isOccupied}
+                      onClick={() => handleTacticChange(tac.name)}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '5px',
+                        border: tac.isOccupied ? `1px solid ${SCROLL.borderSoft}` : tac.isRec ? `2px solid ${SCROLL.gold}` : `1px solid ${SCROLL.border}`,
+                        backgroundColor: tac.isOccupied ? 'rgba(139,94,52,0.08)' : tac.isRec ? 'rgba(163,120,46,0.15)' : tac.isAlternative ? 'rgba(45,90,55,0.1)' : SCROLL.paperMid,
+                        opacity: (!tac.isOwned || tac.isOccupied) ? 0.5 : 1,
+                        cursor: (!tac.isOwned || tac.isOccupied) ? 'not-allowed' : 'pointer',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left'
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: tac.isOccupied ? SCROLL.inkFaint : SCROLL.ink }}>
+                          {tac.isRec && '⭐ '}
+                          {tac.isAlternative && '🔄 '}
+                          {tac.name}
+                        </span>
+
+                        <span style={{ fontSize: '0.75rem', marginLeft: '8px' }}>
+                          {tac.isOccupied ? (
+                            <strong style={{ color: SCROLL.seal }}>[{tac.assignedInfo.squadNum}군 {tac.assignedInfo.generalName} 착용 중]</strong>
+                          ) : tac.isRec ? (
+                            <span style={{ color: SCROLL.gold }}>[공식 추천]</span>
+                          ) : tac.isAlternative ? (
+                            <span style={{ color: '#2d5a37' }}>[대체 메커니즘 전법]</span>
+                          ) : (
+                            <span style={{ color: SCROLL.inkFaint }}>{tac.isOwned ? '[보유]' : '[미보유]'}</span>
+                          )}
+                        </span>
+                      </div>
+
+                      <span style={{ fontWeight: '900', color: tac.isOccupied ? SCROLL.inkFaint : SCROLL.seal, fontSize: '0.9rem' }}>
+                        {tac.score}점
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setEditingTacticTarget(null)}
+                  style={{
+                    marginTop: '18px', width: '100%', padding: '10px',
+                    backgroundColor: SCROLL.seal, color: '#fdf6e3', border: 'none',
+                    borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer'
+                  }}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  </PageLayout>
-);
+    </PageLayout>
+  );
 }

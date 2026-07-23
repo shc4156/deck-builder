@@ -23,8 +23,47 @@
   --font-body: 'Pretendard', -apple-system, sans-serif;
 }
 
+/* ============================================
+   전체 배경 — 軍略圖(군략도) 질감
+   묵청 톤 위에 옅은 등고선 + 좌표 격자를 겹쳐
+   지도/군략도를 펼쳐놓은 듯한 분위기를 냄.
+   ============================================ */
 body {
-  background: radial-gradient(ellipse at 50% -10%, var(--ink-bg-soft) 0%, var(--ink-bg) 60%);
+  background-color: var(--ink-bg);
+  background-image:
+    /* 1) 은은한 등고선/지형선 느낌의 곡선 격자 (아주 옅게) */
+    repeating-radial-gradient(
+      circle at 20% 15%,
+      rgba(184, 147, 90, 0.05) 0px,
+      rgba(184, 147, 90, 0.05) 1px,
+      transparent 1px,
+      transparent 68px
+    ),
+    repeating-radial-gradient(
+      circle at 85% 75%,
+      rgba(184, 147, 90, 0.045) 0px,
+      rgba(184, 147, 90, 0.045) 1px,
+      transparent 1px,
+      transparent 92px
+    ),
+    /* 2) 가는 좌표 격자선 — 군략도의 방안지(方眼紙) 느낌 */
+    repeating-linear-gradient(
+      0deg,
+      rgba(184, 147, 90, 0.035) 0px,
+      rgba(184, 147, 90, 0.035) 1px,
+      transparent 1px,
+      transparent 64px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(184, 147, 90, 0.035) 0px,
+      rgba(184, 147, 90, 0.035) 1px,
+      transparent 1px,
+      transparent 64px
+    ),
+    /* 3) 전체 톤: 기존 묵청 라디얼 그라데이션 유지 */
+    radial-gradient(ellipse at 50% -10%, var(--ink-bg-soft) 0%, var(--ink-bg) 60%);
+  background-attachment: fixed;
   font-family: var(--font-body);
   color: var(--paper-text);
 }
@@ -86,10 +125,19 @@ body {
   border-radius: 1px;
 }
 
-/* 표구(表具) 느낌의 코너 장식이 있는 패널 */
+/* 표구(表具) 느낌의 코너 장식이 있는 패널
+   + 아주 옅은 종이 결(사선)을 얹어 전체 배경과 통일감을 줌 */
 .scroll-panel {
   position: relative;
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(
+      100deg,
+      rgba(139, 94, 52, 0.025) 0px,
+      rgba(139, 94, 52, 0.025) 1px,
+      transparent 1px,
+      transparent 5px
+    );
   border: 1px solid rgba(43, 35, 24, 0.15);
   padding: 22px;
   color: var(--ink-text);
@@ -428,4 +476,29 @@ body {
   .section-heading-row input {
     width: 100% !important;
   }
+}
+
+/* 🍃 모던-고전 하이브리드 카드 */
+.hybrid-card {
+  background: rgba(36, 31, 26, 0.75); /* 모던한 투명 감촉의 어두운 배경 */
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(184, 147, 90, 0.25); /* 얇고 연한 금박 테두리 */
+  border-radius: 12px;
+  transition: all 0.2s ease-in-out;
+}
+
+.hybrid-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* 🏷️ 하이브리드 태그/뱃지 */
+.hybrid-badge-role {
+  background: rgba(166, 50, 42, 0.15);
+  border: 1px solid var(--seal);
+  color: #f2e9d4;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
 }

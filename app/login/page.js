@@ -68,33 +68,134 @@ export default function Login() {
     }
   };
 
+  const inputStyle = {
+    padding: '13px 14px',
+    background: 'var(--paper-soft)',
+    border: '1px solid rgba(184,147,90,0.5)',
+    color: 'var(--ink-text)',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.95rem',
+    outline: 'none',
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '100px' }}>
-      <h1>천하결전 덱 빌더 - {isLoginMode ? '로그인' : '맹원 가입'}</h1>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px 20px',
+        background: 'radial-gradient(ellipse at 50% -10%, var(--ink-bg-soft) 0%, var(--ink-bg) 60%)',
+      }}
+    >
+      {/* ============================================================
+          📜 로그인 / 가입 — 문서형 카드 (墨牒 / 묵첩: 검은 서첩)
+      ============================================================ */}
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '380px',
+          background: 'linear-gradient(180deg, var(--paper-soft) 0%, var(--paper) 45%, var(--paper-soft) 100%)',
+          border: '3px double var(--gold)',
+          borderRadius: '6px',
+          padding: '38px 32px 32px',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.45), inset 0 0 60px rgba(139,94,52,0.08)',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{
+          position: 'absolute', inset: '8px', border: '1px solid rgba(139,94,52,0.3)',
+          borderRadius: '3px', pointerEvents: 'none'
+        }} />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '300px', marginTop: '20px' }}>
-        <input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '10px' }} />
-        <input type="password" placeholder="비밀번호" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: '10px' }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          {/* 인장 마크 + 타이틀 */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '26px' }}>
+            <div style={{
+              width: '52px', height: '52px', borderRadius: '50%',
+              border: '2px solid var(--seal)', color: 'var(--seal)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.3rem', fontWeight: 900, marginBottom: '14px',
+              fontFamily: 'var(--font-display)'
+            }}>
+              盟
+            </div>
+            <h1 className="classic-heading" style={{ margin: 0, fontSize: '1.5rem', textAlign: 'center' }}>
+              천하결전 덱 빌더
+            </h1>
+            <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: 'var(--ink-text)', opacity: 0.75, letterSpacing: '0.05em' }}>
+              {isLoginMode ? '입맹(入盟) 확인' : '맹원 가입'}
+            </p>
+          </div>
 
-        {!isLoginMode && (
-          <>
-            <input type="text" placeholder="맹 닉네임" value={nickname} onChange={(e) => setNickname(e.target.value)} style={{ padding: '10px' }} />
-            <input type="text" placeholder="승인코드" value={approvalCode} onChange={(e) => setApprovalCode(e.target.value)} style={{ padding: '10px' }} />
-            <span style={{ fontSize: '12px', color: '#666' }}>* 승인코드는 지휘부에게 문의해주세요.</span>
-          </>
-        )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <input
+              type="email"
+              placeholder="이메일"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={inputStyle}
+            />
+            <input
+              type="password"
+              placeholder="비밀번호"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={inputStyle}
+            />
 
-        {isLoginMode ? (
-          <>
-            <button onClick={handleLogin} style={{ padding: '10px', backgroundColor: '#3498db', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>로그인</button>
-            <p style={{ fontSize: '13px', textAlign: 'center', cursor: 'pointer', color: '#3498db', marginTop: '10px' }} onClick={() => setIsLoginMode(false)}>계정이 없으신가요? 맹원 가입하기</p>
-          </>
-        ) : (
-          <>
-            <button onClick={handleSignUp} style={{ padding: '10px', backgroundColor: '#2ecc71', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>가입하기</button>
-            <p style={{ fontSize: '13px', textAlign: 'center', cursor: 'pointer', color: '#3498db', marginTop: '10px' }} onClick={() => setIsLoginMode(true)}>이미 계정이 있으신가요? 로그인하기</p>
-          </>
-        )}
+            {!isLoginMode && (
+              <>
+                <input
+                  type="text"
+                  placeholder="맹 닉네임"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  style={inputStyle}
+                />
+                <input
+                  type="text"
+                  placeholder="승인코드"
+                  value={approvalCode}
+                  onChange={(e) => setApprovalCode(e.target.value)}
+                  style={inputStyle}
+                />
+                <span style={{ fontSize: '0.8rem', color: 'var(--seal-dark)', fontWeight: 600 }}>
+                  * 승인코드는 지휘부에게 문의해주세요.
+                </span>
+              </>
+            )}
+
+            {isLoginMode ? (
+              <>
+                <button onClick={handleLogin} className="seal-button" style={{ marginTop: '6px', width: '100%', textAlign: 'center' }}>
+                  로그인
+                </button>
+                <p
+                  style={{ fontSize: '0.85rem', textAlign: 'center', cursor: 'pointer', color: 'var(--seal-dark)', fontWeight: 600, marginTop: '8px' }}
+                  onClick={() => setIsLoginMode(false)}
+                >
+                  계정이 없으신가요? 맹원 가입하기
+                </p>
+              </>
+            ) : (
+              <>
+                <button onClick={handleSignUp} className="seal-button" style={{ marginTop: '6px', width: '100%', textAlign: 'center' }}>
+                  가입하기
+                </button>
+                <p
+                  style={{ fontSize: '0.85rem', textAlign: 'center', cursor: 'pointer', color: 'var(--seal-dark)', fontWeight: 600, marginTop: '8px' }}
+                  onClick={() => setIsLoginMode(true)}
+                >
+                  이미 계정이 있으신가요? 로그인하기
+                </p>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

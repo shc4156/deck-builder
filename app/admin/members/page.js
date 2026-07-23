@@ -323,11 +323,46 @@ export default function MemberManagementPage() {
           ← 홈으로
         </Link>
 
-        <h1 className="classic-heading text-3xl font-bold mb-2">인원 관리</h1>
-        <p style={{ color: 'var(--gold-soft)', marginBottom: '24px', fontSize: '1.05rem', fontWeight: 500 }}>
-          일간 맹원 데이터 엑셀을 업로드하면 액티브 현황과 관리·컷 대상을 자동으로 파악합니다.
-          인게임 주간 수치는 매주 리셋되므로, 실제 판정은 리셋과 무관하게 계속 쌓이는 누적/최근 활동량을 기준으로 합니다.
-        </p>
+        {/* ============================================================
+            📜 인원 관리 — 문서형 헤더 (盟籍簿 / 맹적부)
+        ============================================================ */}
+        <div
+          style={{
+            position: 'relative',
+            background: 'linear-gradient(180deg, var(--paper-soft) 0%, var(--paper) 45%, var(--paper-soft) 100%)',
+            border: '3px double var(--gold)',
+            borderRadius: '6px',
+            padding: '30px 36px',
+            marginBottom: '30px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.16), inset 0 0 60px rgba(139,94,52,0.08)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{
+            position: 'absolute', inset: '8px', border: '1px solid rgba(139,94,52,0.3)',
+            borderRadius: '3px', pointerEvents: 'none'
+          }} />
+
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '18px' }}>
+            <div style={{
+              writingMode: 'vertical-rl', textOrientation: 'upright',
+              fontSize: '1.4rem', fontWeight: 900, letterSpacing: '0.2em',
+              color: 'var(--seal-dark)', flexShrink: 0, lineHeight: 1.3
+            }}>
+              盟籍簿
+            </div>
+
+            <div>
+              <h1 className="classic-heading text-3xl font-bold mb-2" style={{ margin: 0 }}>
+                인원 관리
+              </h1>
+              <p style={{ color: 'var(--ink-text)', opacity: 0.8, marginTop: '10px', fontSize: '1.05rem', fontWeight: 500 }}>
+                일간 맹원 데이터 엑셀을 업로드하면 액티브 현황과 관리·컷 대상을 자동으로 파악합니다.
+                인게임 주간 수치는 매주 리셋되므로, 실제 판정은 리셋과 무관하게 계속 쌓이는 누적/최근 활동량을 기준으로 합니다.
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* 업로드 영역 */}
         <div className="scroll-panel" style={{ padding: '24px', marginBottom: '30px' }}>

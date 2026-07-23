@@ -126,7 +126,45 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
   return (
     <>
       <div>
-        <h1 className="classic-heading text-3xl font-bold mb-4">통합 도감</h1>
+        {/* ============================================================
+            📜 통합 도감 — 문서형 헤더 (圖鑑錄 / 도감록)
+        ============================================================ */}
+        <div
+          style={{
+            position: 'relative',
+            background: 'linear-gradient(180deg, var(--paper-soft) 0%, var(--paper) 45%, var(--paper-soft) 100%)',
+            border: '3px double var(--gold)',
+            borderRadius: '6px',
+            padding: '30px 36px',
+            marginBottom: '24px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.16), inset 0 0 60px rgba(139,94,52,0.08)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{
+            position: 'absolute', inset: '8px', border: '1px solid rgba(139,94,52,0.3)',
+            borderRadius: '3px', pointerEvents: 'none'
+          }} />
+
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '18px' }}>
+            <div style={{
+              writingMode: 'vertical-rl', textOrientation: 'upright',
+              fontSize: '1.4rem', fontWeight: 900, letterSpacing: '0.2em',
+              color: 'var(--seal-dark)', flexShrink: 0, lineHeight: 1.3
+            }}>
+              圖鑑錄
+            </div>
+
+            <div>
+              <h1 className="classic-heading text-3xl font-bold mb-2" style={{ margin: 0 }}>
+                통합 도감
+              </h1>
+              <p style={{ color: 'var(--ink-text)', opacity: 0.8, marginTop: '10px', fontSize: '1.05rem', fontWeight: 500 }}>
+                장수·전법·인연을 한 곳에서 열람하는 기록부입니다.
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div className="classic-subtab-bar">
           <button onClick={() => setDictSubTab('generals')} className={`classic-subtab ${dictSubTab === 'generals' ? 'active' : ''}`}>장수도감</button>
@@ -183,6 +221,10 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
         {dictSubTab === 'synergies' && (
           <section className="scroll-panel">
             {(() => {
+              // 이름 → 장수 데이터(얼굴 이미지 포함) 조회용 맵
+              const generalByName = {};
+              generals.forEach(g => { generalByName[g.name] = g; });
+
               const selectedNames = generals
                 .filter(g => selectedGenerals.includes(g.id))
                 .map(g => g.name);
@@ -206,24 +248,85 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
                   </h2>
                   <div className="synergy-grid">
                     {synergyStatus.map(synergy => (
-                      <div key={synergy.name} className={`synergy-card ${synergy.isComplete ? 'complete' : ''}`}>
-                        <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div
+                        key={synergy.name}
+                        className={`synergy-card ${synergy.isComplete ? 'complete' : ''}`}
+                        style={{ position: 'relative', overflow: 'hidden' }}
+                      >
+                        {/* 결성 완료 시 우상단에 큼직한 인장(印) 도장 */}
+                        {synergy.isComplete && (
+                          <div style={{
+                            position: 'absolute', top: '10px', right: '10px',
+                            width: '40px', height: '40px', borderRadius: '50%',
+                            border: '2px solid var(--seal)', color: 'var(--seal)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.85rem', fontWeight: 900, transform: 'rotate(-12deg)',
+                            opacity: 0.85, pointerEvents: 'none'
+                          }}>
+                            結
+                          </div>
+                        )}
+
+                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '46px' }}>
                           {synergy.isComplete && <span style={{ color: 'var(--gold)' }}>✔</span>}
-                          {synergy.name} ({synergy.matchedMembers.length}/{synergy.req_count}인 결의)
+                          {synergy.name}
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--seal-dark)', opacity: 0.8 }}>
+                            ({synergy.matchedMembers.length}/{synergy.req_count}인 결의)
+                          </span>
                         </h3>
-                        <p style={{ margin: '0 0 10px 0', fontSize: '1rem', color: 'var(--ink-text)', fontWeight: '600' }}>
-                          구성 무장: {synergy.members.map((m, i) => (
-                            <span key={m} style={{
-                              color: synergy.matchedMembers.includes(m) ? 'var(--seal-dark)' : 'var(--ink-text)',
-                              opacity: synergy.matchedMembers.includes(m) ? 1 : 0.55,
-                              fontWeight: synergy.matchedMembers.includes(m) ? 'bold' : 'normal'
-                            }}>
-                              {m}{i < synergy.members.length - 1 ? ', ' : ''}
-                            </span>
-                          ))}
-                        </p>
-                        <p style={{ margin: '0', fontSize: '1.05rem', color: 'var(--ink-text)', fontWeight: 'bold', lineHeight: '1.4' }}>
-                          인연 효과: <GlossaryText text={synergy.effect} onTermClick={setGlossaryTerm} />
+
+                        {/* 구성 무장: 얼굴 썸네일 + 이름 칩 */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                          {synergy.members.map((m) => {
+                            const matched = synergy.matchedMembers.includes(m);
+                            const gen = generalByName[m];
+                            return (
+                              <div key={m} style={{
+                                display: 'flex', alignItems: 'center', gap: '5px',
+                                padding: '3px 9px 3px 3px', borderRadius: '999px',
+                                backgroundColor: matched ? 'rgba(166,50,42,0.08)' : 'rgba(43,35,24,0.05)',
+                                border: `1px solid ${matched ? 'var(--seal)' : 'rgba(43,35,24,0.18)'}`,
+                                opacity: matched ? 1 : 0.55
+                              }}>
+                                {gen?.image_url ? (
+                                  <img
+                                    src={gen.image_url}
+                                    alt={m}
+                                    style={{
+                                      width: '24px', height: '24px', borderRadius: '50%',
+                                      objectFit: 'cover',
+                                      filter: matched ? 'none' : 'grayscale(70%)',
+                                      border: `1px solid ${matched ? 'var(--gold)' : 'rgba(43,35,24,0.25)'}`
+                                    }}
+                                  />
+                                ) : (
+                                  <span style={{
+                                    width: '24px', height: '24px', borderRadius: '50%',
+                                    backgroundColor: 'rgba(43,35,24,0.12)', display: 'inline-flex',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '0.7rem', color: 'var(--ink-text)'
+                                  }}>
+                                    {m.charAt(0)}
+                                  </span>
+                                )}
+                                <span style={{
+                                  fontSize: '0.85rem',
+                                  color: matched ? 'var(--seal-dark)' : 'var(--ink-text)',
+                                  fontWeight: matched ? 'bold' : 'normal'
+                                }}>
+                                  {m}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <p style={{
+                          margin: 0, fontSize: '1.02rem', color: 'var(--ink-text)', fontWeight: 'bold',
+                          lineHeight: '1.5', borderTop: '1px dashed rgba(184,147,90,0.4)', paddingTop: '10px'
+                        }}>
+                          <span style={{ color: 'var(--seal-dark)' }}>인연 효과 · </span>
+                          <GlossaryText text={synergy.effect} onTermClick={setGlossaryTerm} />
                         </p>
                       </div>
                     ))}

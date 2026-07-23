@@ -23,6 +23,37 @@ export default function MatchesPage() {
 const [selectedModalGeneral, setSelectedModalGeneral] = useState(null);
 const [selectedModalTactic, setSelectedModalTactic] = useState(null);
 
+  // 📜 열람인 닉네임 (대조록 직인용)
+  const [userNickname, setUserNickname] = useState('백정');
+
+  useEffect(() => {
+    const fetchUserNickname = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('nickname')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('프로필 조회 실패:', error.message);
+          return;
+        }
+
+        if (profile && profile.nickname) {
+          setUserNickname(profile.nickname);
+        }
+      } catch (err) {
+        console.error('닉네임 로드 중 예외 발생:', err);
+      }
+    };
+
+    fetchUserNickname();
+  }, []);
+
   useEffect(() => {
     async function fetchPinnedDecks() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -33,8 +64,11 @@ const [selectedModalTactic, setSelectedModalTactic] = useState(null);
           .eq('id', user.id)
           .single();
         
-        if (data?.pinned_decks) {
+        // 🔹 [수정] Array.isArray로 확인 후 배열일 때만 set, 아니면 빈 배열([]) 설정
+        if (data?.pinned_decks && Array.isArray(data.pinned_decks)) {
           setMyPinnedDecks(data.pinned_decks);
+        } else {
+          setMyPinnedDecks([]);
         }
       }
     }
@@ -47,7 +81,8 @@ const togglePin = async (deckId) => {
   const targetId = String(deckId);
 
   // 2. 현재 핀 목록에서도 문자열로 다루어 비교 (타입 차이로 인한 이슈 방지)
-  const isAlreadyPinned = myPinnedDecks.some(id => String(id) === targetId);
+  const currentPinnedList = Array.isArray(myPinnedDecks) ? myPinnedDecks : [];
+const isAlreadyPinned = currentPinnedList.some(id => String(id) === targetId);
 
   let newPins = [];
   if (isAlreadyPinned) {
@@ -196,20 +231,80 @@ const togglePin = async (deckId) => {
           <Link href="/vs" className="classic-tab">⚔️ 모의 대결</Link>
         </nav>
 
-        <h1 className="classic-heading text-3xl font-bold mb-2">티어덱 &amp; 개척추천 매칭</h1>
-        <p style={{ color: 'var(--gold-soft)', marginBottom: '30px', fontSize: '1.05rem', fontWeight: 500 }}>
-          현재 보유하신 막사 자산을 토대로 천하를 호령할 수 있는 최적의 군사 배치를 정렬하여 제안합니다. (📌 핀 고정 시 최상단 고정)
-        </p>
+        {/* ============================================================
+            📜 전략대조록(戰略對照錄) — 문서형 헤더
+        ============================================================ */}
+        <div
+          style={{
+            position: 'relative',
+            background: 'linear-gradient(180deg, var(--paper-soft) 0%, var(--paper) 45%, var(--paper-soft) 100%)',
+            border: '3px double var(--gold)',
+            borderRadius: '6px',
+            padding: '32px 40px',
+            marginBottom: '30px',
+            boxShadow: '0 8px 26px rgba(0,0,0,0.18), inset 0 0 70px rgba(139,94,52,0.08)',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{
+            position: 'absolute', inset: '8px', border: '1px solid rgba(139,94,52,0.3)',
+            borderRadius: '3px', pointerEvents: 'none'
+          }} />
 
-        <div className="classic-subtab-bar">
-          <button onClick={() => setDeckFilter('all')} className={`classic-subtab ${deckFilter === 'all' ? 'active' : ''}`}>
-            전체 전략표 ({tierDecks.length})
-          </button>
-          
+          <div style={{
+            position: 'relative', zIndex: 1,
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between'
+          }}>
+            <div style={{
+              writingMode: 'vertical-rl', textOrientation: 'upright',
+              fontSize: '1.4rem', fontWeight: 900, letterSpacing: '0.2em',
+              color: 'var(--seal-dark)', flexShrink: 0, marginRight: '18px', lineHeight: 1.3
+            }}>
+              戰略對照錄
+            </div>
+
+            <div style={{ flex: 1, textAlign: 'center', paddingTop: '2px' }}>
+              <h1 className="classic-heading text-3xl font-bold mb-2" style={{ margin: 0 }}>
+                티어덱 &amp; 개척추천 매칭
+              </h1>
+              <p style={{ color: 'var(--ink-text)', opacity: 0.85, marginTop: '10px', fontSize: '1.02rem', fontWeight: 500, lineHeight: 1.6 }}>
+                현재 보유하신 막사 자산을 토대로 천하를 호령할 수 있는 최적의 군사 배치를 정렬하여 제안합니다.<br />
+                (📌 핀 고정 시 최상단 고정)
+              </p>
+            </div>
+
+            <div style={{ flexShrink: 0, marginLeft: '18px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{
+                width: '62px', height: '62px',
+                border: '3px solid var(--seal-dark)',
+                borderRadius: '4px',
+                backgroundColor: 'rgba(139,41,31,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transform: 'rotate(-3deg)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+              }}>
+                <span style={{
+                  writingMode: 'vertical-rl', textOrientation: 'upright',
+                  fontSize: '0.85rem', fontWeight: 900, color: 'var(--seal-dark)', letterSpacing: '0.1em'
+                }}>
+                  {userNickname || '맹원'}覽
+                </span>
+              </div>
+              <span style={{ fontSize: '0.65rem', color: 'var(--ink-text)', opacity: 0.7, marginTop: '6px' }}>열람인 직인</span>
+            </div>
+          </div>
+
+          <div style={{ position: 'relative', zIndex: 1, marginTop: '22px', borderTop: '1px dashed rgba(139,94,52,0.4)', paddingTop: '18px' }}>
+            <div className="classic-subtab-bar">
+              <button onClick={() => setDeckFilter('all')} className={`classic-subtab ${deckFilter === 'all' ? 'active' : ''}`}>
+                전체 전략표 ({tierDecks.length})
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="deck-general-grid" style={{ marginBottom: '22px' }}>
-          {filteredDecks.map(deck => {
+          {filteredDecks.map((deck, deckIdx) => {
             const { totalPercent, myGenNames, myTactNames, parsedSetup } = deck.matchInfo;
             const isStartDeck = deck.deck_type === 'start';
             
@@ -252,6 +347,15 @@ const togglePin = async (deckId) => {
                   📌
                 </button>
 
+                {/* 📋 문서 항목번호 */}
+                <span style={{
+                  position: 'absolute', top: '24px', left: '58px',
+                  fontSize: '0.78rem', fontWeight: 900, color: 'var(--seal-dark)',
+                  letterSpacing: '0.05em'
+                }}>
+                  第{deckIdx + 1}號
+                </span>
+
                 <div style={{ position: 'absolute', top: '24px', right: '28px', textAlign: 'right' }}>
               
                   <span style={{
@@ -263,7 +367,7 @@ const togglePin = async (deckId) => {
                 </div>
 
                 {/* 덱 이름 & 설명 */}
-                <h3 className="deck-title classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '6px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%', paddingLeft: '35px' }}>
+                <h3 className="deck-title classic-heading" style={{ fontSize: '1.6rem', fontWeight: '900', marginBottom: '6px', borderBottom: '2px solid var(--gold)', paddingBottom: '6px', width: '65%', paddingLeft: '35px', marginTop: '18px' }}>
                   {deck.deck_name}
                 </h3>
                 {deck.description && (
@@ -292,11 +396,11 @@ const togglePin = async (deckId) => {
                 <div style={{ marginBottom: '25px', fontSize: '1.05rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--paper-soft)', padding: '14px 20px', border: '1px solid rgba(184,147,90,0.35)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <span style={{ backgroundColor: 'var(--seal)', padding: '4px 10px', fontWeight: 'bold', color: 'var(--paper-soft)', fontSize: '0.85rem' }}>추천 군진</span>
+                      <span style={{ backgroundColor: 'var(--seal)', padding: '4px 10px', fontWeight: 'bold', color: 'var(--paper-soft)', fontSize: '0.85rem' }}>추천 진형</span>
                       <span style={{ fontWeight: '900', color: 'var(--seal-dark)', fontSize: '1.2rem' }}>{formationInfo.name}</span>
                     </div>
                     <div style={{ fontSize: '1.05rem', color: 'var(--ink-text)', fontWeight: 'bold', marginTop: '4px', paddingLeft: '2px' }}>
-                      군진효과: {formationInfo.effect}
+                      진형효과: {formationInfo.effect}
                     </div>
                   </div>
                   {/* ⭕ 수정: 0과 1 위치에 맞춰 실제 장수 이름(parsedSetup)을 매핑한 배열 전달 */}
