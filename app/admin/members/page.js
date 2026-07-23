@@ -130,6 +130,38 @@ function sumRecentWindow(entries, latestDateStr, windowDays) {
   return { meritSum, contribSum, siegeSum, daysCounted };
 }
 
+// 접기/펼치기 가능한 명단 섹션 — 데이터가 길게 늘어질 때 기본 접힘 상태로 표시
+function ToggleSection({ title, count, accentColor = 'var(--seal-dark)', defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="scroll-panel" style={{ padding: 0, marginBottom: '14px', overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px', background: 'transparent', border: 'none', cursor: 'pointer',
+          textAlign: 'left'
+        }}
+      >
+        <span className="classic-heading" style={{ fontSize: '1.05rem', color: accentColor }}>
+          {title} {typeof count === 'number' && <span style={{ fontWeight: 700 }}>({count}명)</span>}
+        </span>
+        <span style={{
+          fontSize: '0.85rem', color: 'var(--ink-text)', opacity: 0.7,
+          transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease'
+        }}>
+          ▼
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: '0 20px 18px 20px', borderTop: '1px dashed rgba(184,147,90,0.35)' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MemberManagementPage() {
   const [dayLabel, setDayLabel] = useState(todayDayLabel());
   const [parsedRows, setParsedRows] = useState([]);
@@ -311,6 +343,18 @@ export default function MemberManagementPage() {
     .sort((a, b) => a.dailyContribDelta - b.dailyContribDelta)
     .slice(0, 10)
     .map((r) => ({ name: r.member_name, 오늘증가분: r.dailyContribDelta }));
+
+  // ── 공성/쟁 참여 분석 (신규(1일 미만) 제외) ─────────────
+  // 신규 판정: 과거(오늘 이전) 날짜 데이터에 한 번도 없었다가 오늘 처음 등장 = 1일 미만 가입자
+  // 공성 참여: 주 공성 횟수(siege_count) >= 1
+  // 쟁 참여: 무훈(weekly_merit) 증가분(dailyMeritDelta) > 0 — 무훈 증가는 전쟁 참여의 증거
+  const veteranData = currentDayData.filter((r) => !r.isNew); // 1일 이상 가입자만
+  const siegeParticipants = veteranData.filter((r) => r.siege_count >= 1);
+  const warParticipants = veteranData.filter((r) => r.dailyMeritDelta > 0);
+  const eitherParticipants = veteranData.filter((r) => r.siege_count >= 1 || r.dailyMeritDelta > 0);
+  const noneParticipants = veteranData.filter((r) => r.siege_count < 1 && r.dailyMeritDelta <= 0);
+
+  const pct = (n, total) => (total === 0 ? '0.0' : ((n / total) * 100).toFixed(1));
 
   return (
     <PageLayout>
@@ -651,6 +695,143 @@ export default function MemberManagementPage() {
                 </table>
               </div>
             </div>
+
+            {/* ============================================================
+                📜 공성/쟁 참여 분석 (1일 이상 가입자 기준, 신규 제외)
+            ============================================================ */}
+            <div
+              style={{
+                position: 'relative',
+                background: 'linear-gradient(180deg, var(--paper-soft) 0%, var(--paper) 45%, var(--paper-soft) 100%)',
+                border: '3px double var(--gold)',
+                borderRadius: '6px',
+                padding: '26px 30px',
+                marginTop: '30px',
+                marginBottom: '18px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.16), inset 0 0 60px rgba(139,94,52,0.08)',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{
+                position: 'absolute', inset: '8px', border: '1px solid rgba(139,94,52,0.3)',
+                borderRadius: '3px', pointerEvents: 'none'
+              }} />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <h2 className="classic-heading" style={{ fontSize: '1.35rem', margin: '0 0 8px 0' }}>
+                  공성·쟁 참여 현황 (1일 이상 가입자 기준)
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--ink-text)', opacity: 0.8, lineHeight: 1.6 }}>
+                  오늘 처음 등장한 신규(1일 미만) 가입자는 제외했습니다. 공성 참여는 주 공성 횟수 1회 이상,
+                  쟁 참여는 오늘 무훈 증가(전쟁 참여의 증거)가 있는 경우로 판정합니다.
+                </p>
+              </div>
+            </div>
+
+            {/* 요약 통계 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+              <div className="scroll-panel" style={{ padding: '18px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '6px' }}>1일 이상 가입자</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--ink-text)' }}>{veteranData.length}</div>
+              </div>
+              <div className="scroll-panel" style={{ padding: '18px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '6px' }}>공성 참여</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--jade)' }}>
+                  {siegeParticipants.length}
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '4px', opacity: 0.75 }}>
+                    ({pct(siegeParticipants.length, veteranData.length)}%)
+                  </span>
+                </div>
+              </div>
+              <div className="scroll-panel" style={{ padding: '18px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '6px' }}>쟁 참여</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--jade)' }}>
+                  {warParticipants.length}
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '4px', opacity: 0.75 }}>
+                    ({pct(warParticipants.length, veteranData.length)}%)
+                  </span>
+                </div>
+              </div>
+              <div className="scroll-panel" style={{ padding: '18px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '6px' }}>공성·쟁 중 하나라도 참여</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--seal-dark)' }}>
+                  {eitherParticipants.length}
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '4px', opacity: 0.75 }}>
+                    ({pct(eitherParticipants.length, veteranData.length)}%)
+                  </span>
+                </div>
+              </div>
+              <div className="scroll-panel" style={{ padding: '18px', textAlign: 'center', border: '2px solid var(--seal)' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '6px' }}>둘 다 미참여</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--seal)' }}>
+                  {noneParticipants.length}
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, marginLeft: '4px', opacity: 0.75 }}>
+                    ({pct(noneParticipants.length, veteranData.length)}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 명단 토글 4종 */}
+            <ToggleSection title="공성 참여 명단" count={siegeParticipants.length} accentColor="var(--jade)">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', paddingTop: '14px' }}>
+                {siegeParticipants
+                  .sort((a, b) => b.siege_count - a.siege_count)
+                  .map((r) => (
+                    <div key={r.char_id} style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.3)', fontSize: '0.88rem' }}>
+                      <strong>{r.member_name}</strong>
+                      <span style={{ color: 'var(--ink-text)', marginLeft: '6px' }}>{r.job} · {r.group_name}</span>
+                      <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>공성 {r.siege_count}회</span>
+                    </div>
+                  ))}
+              </div>
+            </ToggleSection>
+
+            <ToggleSection title="쟁 참여 명단 (오늘 무훈 증가)" count={warParticipants.length} accentColor="var(--jade)">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', paddingTop: '14px' }}>
+                {warParticipants
+                  .sort((a, b) => b.dailyMeritDelta - a.dailyMeritDelta)
+                  .map((r) => (
+                    <div key={r.char_id} style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.3)', fontSize: '0.88rem' }}>
+                      <strong>{r.member_name}</strong>
+                      <span style={{ color: 'var(--ink-text)', marginLeft: '6px' }}>{r.job} · {r.group_name}</span>
+                      <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>무훈 +{r.dailyMeritDelta.toLocaleString()}</span>
+                    </div>
+                  ))}
+              </div>
+            </ToggleSection>
+
+            <ToggleSection title="공성·쟁 중 하나라도 참여한 명단" count={eitherParticipants.length} accentColor="var(--seal-dark)">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', paddingTop: '14px' }}>
+                {eitherParticipants
+                  .sort((a, b) => a.member_name.localeCompare(b.member_name))
+                  .map((r) => (
+                    <div key={r.char_id} style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.3)', fontSize: '0.88rem' }}>
+                      <strong>{r.member_name}</strong>
+                      <span style={{ color: 'var(--ink-text)', marginLeft: '6px' }}>{r.job} · {r.group_name}</span>
+                      <span style={{ marginLeft: '6px' }}>
+                        {r.siege_count >= 1 && <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginRight: '4px' }}>공성{r.siege_count}</span>}
+                        {r.dailyMeritDelta > 0 && <span style={{ color: 'var(--jade)', fontWeight: 'bold' }}>쟁+{r.dailyMeritDelta.toLocaleString()}</span>}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </ToggleSection>
+
+            <ToggleSection title="공성·쟁 모두 미참여 명단 (관리 필요)" count={noneParticipants.length} accentColor="var(--seal)">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', paddingTop: '14px' }}>
+                {noneParticipants
+                  .sort((a, b) => a.member_name.localeCompare(b.member_name))
+                  .map((r) => (
+                    <div key={r.char_id} style={{
+                      padding: '8px 10px', border: '1px solid var(--seal)', fontSize: '0.88rem',
+                      backgroundColor: 'rgba(166,50,42,0.06)'
+                    }}>
+                      <strong>{r.member_name}</strong>
+                      <span style={{ color: 'var(--ink-text)', marginLeft: '6px' }}>{r.job} · {r.group_name}</span>
+                    </div>
+                  ))}
+              </div>
+            </ToggleSection>
           </>
         )}
       </div>
