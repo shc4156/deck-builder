@@ -76,6 +76,17 @@ export default function AdminPage() {
               주간 맹원 데이터를 업로드해 액티브 현황과 관리·컷 대상을 파악합니다.
             </p>
           </Link>
+
+          <Link href="/admin/report" className="scroll-panel" style={{
+            padding: '28px 24px', textDecoration: 'none', display: 'block',
+            transition: 'all 0.2s ease'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>📊</div>
+            <h3 className="classic-heading" style={{ fontSize: '1.2rem', margin: '0 0 8px 0' }}>주간 리포트</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--ink-text)', margin: 0, opacity: 0.75 }}>
+              액티브율·신규 유입·공성쟁 참여율 추이를 한 장의 보고서로 확인합니다.
+            </p>
+          </Link>
         </div>
       </div>
     </PageLayout>

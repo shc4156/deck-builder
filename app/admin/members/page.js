@@ -260,9 +260,21 @@ export default function MemberManagementPage() {
   const latestDay = recentDays[0];
   const prevDay = recentDays[1];
 
-  // 오늘 이전에 한 번이라도 존재했는지로 신규멤버 판별
+  // 신규(가입 2일 미만) 판별: 오늘 기준 이틀 전(그저께) 이전 날짜에
+  // 한 번도 존재하지 않았다면 "2일 미만 가입자"로 간주해 참여 분석에서 제외한다.
+  // (단순히 "어제 데이터에 없음"만 보면 하루만 비어도 신규로 오판할 수 있어,
+  //  latestDay 기준으로 이틀(48시간) 이전 날짜까지를 명시적으로 계산한다.)
+  const twoDaysBeforeLatest = latestDay
+    ? (() => {
+        const d = new Date(latestDay);
+        d.setDate(d.getDate() - 2);
+        return d.toISOString().slice(0, 10);
+      })()
+    : null;
   const pastCharIds = new Set(
-    weeklyStats.filter((r) => r.week_label !== latestDay).map((r) => r.char_id)
+    weeklyStats
+      .filter((r) => twoDaysBeforeLatest && r.week_label <= twoDaysBeforeLatest)
+      .map((r) => r.char_id)
   );
 
   // 오늘자 데이터 + 누적치 + 최근 윈도우 활동량을 합친 최종 데이터
@@ -344,11 +356,11 @@ export default function MemberManagementPage() {
     .slice(0, 10)
     .map((r) => ({ name: r.member_name, 오늘증가분: r.dailyContribDelta }));
 
-  // ── 공성/쟁 참여 분석 (신규(1일 미만) 제외) ─────────────
-  // 신규 판정: 과거(오늘 이전) 날짜 데이터에 한 번도 없었다가 오늘 처음 등장 = 1일 미만 가입자
+  // ── 공성/쟁 참여 분석 (신규(2일 미만) 제외) ─────────────
+  // 신규 판정: 그저께 이전 날짜 데이터에 한 번도 없었다가 최근 등장 = 2일 미만 가입자
   // 공성 참여: 주 공성 횟수(siege_count) >= 1
   // 쟁 참여: 무훈(weekly_merit) 증가분(dailyMeritDelta) > 0 — 무훈 증가는 전쟁 참여의 증거
-  const veteranData = currentDayData.filter((r) => !r.isNew); // 1일 이상 가입자만
+  const veteranData = currentDayData.filter((r) => !r.isNew); // 2일 이상 가입자만
   const siegeParticipants = veteranData.filter((r) => r.siege_count >= 1);
   const warParticipants = veteranData.filter((r) => r.dailyMeritDelta > 0);
   const eitherParticipants = veteranData.filter((r) => r.siege_count >= 1 || r.dailyMeritDelta > 0);
@@ -592,11 +604,13 @@ export default function MemberManagementPage() {
 
             {/* 컷 대상 목록 */}
             {cutTargets.length > 0 && (
-              <div className="scroll-panel" style={{ padding: '24px', marginBottom: '24px', border: '2px solid var(--seal)' }}>
-                <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--seal-dark)' }}>
-                  ⚠ 2일 연속 비액티브 (컷 대상, 최근 {windowDays}일 기준)
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+              <ToggleSection
+                title="⚠ 2일 연속 비액티브 (컷 대상)"
+                count={cutTargets.length}
+                accentColor="var(--seal-dark)"
+                defaultOpen={true}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', paddingTop: '14px' }}>
                   {cutTargets.map((r) => (
                     <div key={r.char_id} style={{
                       padding: '12px', border: '2px solid var(--seal)', backgroundColor: 'rgba(166,50,42,0.06)'
@@ -611,15 +625,12 @@ export default function MemberManagementPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </ToggleSection>
             )}
 
             {/* 필터 3종 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-              <div className="scroll-panel" style={{ padding: '20px' }}>
-                <h3 className="classic-heading" style={{ fontSize: '1.05rem', marginBottom: '12px' }}>
-                  오늘 무훈 증가 0 ({zeroMeritList.length}명)
-                </h3>
+            <ToggleSection title="오늘 무훈 증가 0" count={zeroMeritList.length} accentColor="var(--jade)">
+              <div style={{ paddingTop: '14px' }}>
                 {zeroMeritList.map((r) => (
                   <div key={r.char_id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(184,147,90,0.15)', fontSize: '0.9rem' }}>
                     <strong>{r.member_name}</strong> {r.isNew && <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>[신규]</span>}
@@ -627,11 +638,14 @@ export default function MemberManagementPage() {
                   </div>
                 ))}
               </div>
+            </ToggleSection>
 
-              <div className="scroll-panel" style={{ padding: '20px' }}>
-                <h3 className="classic-heading" style={{ fontSize: '1.05rem', marginBottom: '12px' }}>
-                  최근 {windowDays}일 공헌 {contribThreshold.toLocaleString()} 이하 ({lowContribList.length}명)
-                </h3>
+            <ToggleSection
+              title={`최근 ${windowDays}일 공헌 ${contribThreshold.toLocaleString()} 이하`}
+              count={lowContribList.length}
+              accentColor="var(--jade)"
+            >
+              <div style={{ paddingTop: '14px' }}>
                 {lowContribList.map((r) => (
                   <div key={r.char_id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(184,147,90,0.15)', fontSize: '0.9rem' }}>
                     <strong>{r.member_name}</strong> {r.isNew && <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>[신규]</span>}
@@ -639,11 +653,10 @@ export default function MemberManagementPage() {
                   </div>
                 ))}
               </div>
+            </ToggleSection>
 
-              <div className="scroll-panel" style={{ padding: '20px' }}>
-                <h3 className="classic-heading" style={{ fontSize: '1.05rem', marginBottom: '12px' }}>
-                  누적 공성횟수 낮은 순
-                </h3>
+            <ToggleSection title="누적 공성횟수 낮은 순" count={Math.min(lowSiegeList.length, 15)} accentColor="var(--jade)">
+              <div style={{ paddingTop: '14px' }}>
                 {lowSiegeList.slice(0, 15).map((r) => (
                   <div key={r.char_id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(184,147,90,0.15)', fontSize: '0.9rem' }}>
                     <strong>{r.member_name}</strong> {r.isNew && <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>[신규]</span>}
@@ -651,14 +664,16 @@ export default function MemberManagementPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </ToggleSection>
 
             {/* 오늘 관리대상(비액티브) 전체 목록 */}
-            <div className="scroll-panel" style={{ padding: '24px' }}>
-              <h3 className="classic-heading" style={{ fontSize: '1.2rem', marginBottom: '16px' }}>
-                오늘 관리대상 전체 ({inactiveToday.length}명)
-              </h3>
-              <div style={{ overflowX: 'auto' }}>
+            <ToggleSection
+              title="오늘 관리대상 전체"
+              count={inactiveToday.length}
+              accentColor="var(--seal-dark)"
+              defaultOpen={true}
+            >
+              <div style={{ overflowX: 'auto', paddingTop: '14px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.92rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--gold)' }}>
@@ -694,10 +709,10 @@ export default function MemberManagementPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </ToggleSection>
 
             {/* ============================================================
-                📜 공성/쟁 참여 분석 (1일 이상 가입자 기준, 신규 제외)
+                📜 공성/쟁 참여 분석 (2일 이상 가입자 기준, 신규 제외)
             ============================================================ */}
             <div
               style={{
@@ -718,10 +733,10 @@ export default function MemberManagementPage() {
               }} />
               <div style={{ position: 'relative', zIndex: 1 }}>
                 <h2 className="classic-heading" style={{ fontSize: '1.35rem', margin: '0 0 8px 0' }}>
-                  공성·쟁 참여 현황 (1일 이상 가입자 기준)
+                  공성·쟁 참여 현황 (2일 이상 가입자 기준)
                 </h2>
                 <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--ink-text)', opacity: 0.8, lineHeight: 1.6 }}>
-                  오늘 처음 등장한 신규(1일 미만) 가입자는 제외했습니다. 공성 참여는 주 공성 횟수 1회 이상,
+                  최근 등장한 신규(2일 미만) 가입자는 제외했습니다. 공성 참여는 주 공성 횟수 1회 이상,
                   쟁 참여는 오늘 무훈 증가(전쟁 참여의 증거)가 있는 경우로 판정합니다.
                 </p>
               </div>
@@ -730,7 +745,7 @@ export default function MemberManagementPage() {
             {/* 요약 통계 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
               <div className="scroll-panel" style={{ padding: '18px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '6px' }}>1일 이상 가입자</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', marginBottom: '6px' }}>2일 이상 가입자</div>
                 <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--ink-text)' }}>{veteranData.length}</div>
               </div>
               <div className="scroll-panel" style={{ padding: '18px', textAlign: 'center' }}>

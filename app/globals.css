@@ -293,6 +293,8 @@ body {
   letter-spacing: 0.15em;
   color: var(--gold);
   margin: 0;
+  display: inline-flex;
+  align-items: center;
 }
 
 .site-banner-subtitle {
@@ -429,13 +431,6 @@ body {
     grid-template-columns: 1fr;
     gap: 20px;
   }
-}
-
-.letter-form-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
-  align-items: start;
 }
 
 .entry-row {

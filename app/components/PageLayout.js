@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useProfile } from './ProfileContext';
 import AccountSwitcher from './AccountSwitcher';
+import VersionBadge from './VersionBadge';
 import { supabase } from '../lib/supabaseClient';
 
 export default function PageLayout({ children }) {
@@ -37,7 +38,10 @@ export default function PageLayout({ children }) {
 
         <div className="site-banner-titlerow">
           <span className="site-banner-ornament" />
-          <h1 className="site-banner-title">편제방(編制房)</h1>
+          <h1 className="site-banner-title">
+            편제방(編制房)
+            <VersionBadge />
+          </h1>
           <span className="site-banner-ornament" />
         </div>
         <p className="site-banner-subtitle">삼국지 천하결전 덱 편성 · 14서버 꼬마맹 백정</p>
