@@ -22,6 +22,7 @@ export default function MyDeckPage() {
   } = useDeckAssets();
 
   const [activeTab, setActiveTab] = useState('my-assets');
+  const [showNotice, setShowNotice] = useState(true);
 
   // 🔹 필터 상태 추가 (기본값: '전체')
   const [generalFactionFilter, setGeneralFactionFilter] = useState('전체');
@@ -370,6 +371,63 @@ export default function MyDeckPage() {
           </>
         )}
       </div>
+
+      {/* 📢 피드백 안내 팝업 모달 */}
+{showNotice && (
+  <div style={{
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+    padding: '20px',
+  }}>
+    <div className="scroll-panel" style={{
+      width: '100%',
+      maxWidth: '440px',
+      backgroundColor: 'var(--paper-soft)',
+      border: '2px solid var(--gold)',
+      borderRadius: '8px',
+      padding: '28px 24px',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+      textAlign: 'center',
+      position: 'relative'
+    }}>
+      <h3 className="classic-title text-2xl font-bold" style={{ marginBottom: '14px', color: 'var(--seal-dark)' }}>
+        🚨 테스트 버전 안내
+      </h3>
+      
+      <p style={{ fontSize: '0.95rem', color: 'var(--ink-text)', lineHeight: '1.6', marginBottom: '16px' }}>
+        현재 <strong>천하결전 덱 편성 웹앱</strong>은 정식 오픈 전 <strong>테스트 버전</strong>입니다. 
+      </p>
+
+      <div style={{
+        padding: '14px',
+        backgroundColor: 'rgba(139,41,31,0.05)',
+        border: '1px dashed var(--gold)',
+        borderRadius: '6px',
+        marginBottom: '20px'
+      }}>
+        <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--seal-dark)', fontWeight: 'bold', lineHeight: '1.5' }}>
+          💬 여러분의 적극적인 피드백을 기다립니다!
+        </p>
+        <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: 'var(--ink-text)', opacity: 0.85 }}>
+          사용 중 발생한 오류나 추가되었으면 하는 기능이 있다면 상단 [📝 의견 남기기] 탭을 통해 아낌없이 전해 주세요.
+        </p>
+      </div>
+
+      <button
+        className="seal-button"
+        onClick={() => setShowNotice(false)}
+        style={{ width: '100%', padding: '10px 0', fontSize: '0.95rem' }}
+      >
+        확인했습니다 (막사 입장)
+      </button>
+    </div>
+  </div>
+)}
     </PageLayout>
   );
 }
