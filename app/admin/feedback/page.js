@@ -1,15 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { factionColors, tacticColors } from '../styles/colors';
-import PageLayout from './components/PageLayout';
-import { useDeckAssets } from '../hooks/useDeckAssets';
-import Dictionary from './components/Dictionary';
-import { recommendFullSquads } from './lib/squadRecommendation';
-import { matchFormationInfo } from '../data/synergies';
-import ScreenshotChecker from './components/ScreenshotChecker';
-import { supabase } from './lib/supabaseClient';
-import FeedbackForm from './components/FeedbackForm';
+import { factionColors, tacticColors } from '../../../styles/colors';
+import PageLayout from '../../components/PageLayout';
+import { useDeckAssets } from '../../../hooks/useDeckAssets';
+import Dictionary from '../../components/Dictionary';
+import { recommendFullSquads } from '../../lib/squadRecommendation';
+import { matchFormationInfo } from '../../../data/synergies';
+import ScreenshotChecker from '../../components/ScreenshotChecker';
+import FeedbackForm from '../../components/FeedbackForm';
+import { supabase } from '../../lib/supabaseClient';
 
 const HANJA_NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
@@ -61,7 +61,7 @@ export default function MyDeckPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabFromUrl = params.get('tab');
-    if (tabFromUrl && ['my-assets', 'dictionary', 'auto-squad'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['my-assets', 'dictionary', 'auto-squad', 'feedback'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, []);
@@ -119,11 +119,11 @@ export default function MyDeckPage() {
           </Link>
           <Link href="/vs" className="classic-tab">⚔️ 모의 대결</Link>
           <button
-  onClick={() => setActiveTab('feedback')}
-  className={`classic-tab ${activeTab === 'feedback' ? 'active' : ''}`}
->
-  📝 의견 남기기
-</button>
+            onClick={() => setActiveTab('feedback')}
+            className={`classic-tab ${activeTab === 'feedback' ? 'active' : ''}`}
+          >
+            📝 의견 남기기
+          </button>
         </nav>
 
         {isLoading ? (
@@ -362,10 +362,11 @@ export default function MyDeckPage() {
                 selectedTactics={selectedTactics}
               />
             )}
+
             {/* 3. 의견 남기기 탭 */}
-{activeTab === 'feedback' && (
-  <FeedbackForm userNickname={userNickname} />
-)}
+            {activeTab === 'feedback' && (
+              <FeedbackForm userNickname={userNickname} />
+            )}
 
           </>
         )}
