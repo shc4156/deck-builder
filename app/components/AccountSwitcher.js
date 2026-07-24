@@ -6,15 +6,22 @@ import { useProfile } from './ProfileContext';
 
 export default function AccountSwitcher() {
   const [open, setOpen] = useState(false);
+  const [accounts, setAccounts] = useState([]); // 👈 State로 변경
   const profile = useProfile();
-  const accounts = getSavedAccounts();
+  useEffect(() => {
+    if (open) {
+      setAccounts(getSavedAccounts());
+    }
+  }, [open]);
+
+  console.log('현재 Profile Context 값:', profile); // 👈 디버깅용 로그
 
   const switchTo = async (account) => {
-    await supabase.auth.signOut();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: account.email,
-      password: account.password
-    });
+  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: account.email,
+    password: account.password
+  });
     if (error) {
       alert('전환 실패: ' + error.message);
       return;
@@ -26,29 +33,30 @@ export default function AccountSwitcher() {
     e.stopPropagation();
     if (confirm('이 계정을 목록에서 삭제할까요?')) {
       removeAccount(email);
-      setOpen(false);
-      setTimeout(() => setOpen(true), 0); // 목록 즉시 갱신
+      setAccounts(getSavedAccounts()); // 👈 React State로 깔끔하게 갱신
     }
   };
 
   //if (accounts.length === 0) return null;
+  // 닉네임 텍스트 안전 추출
+  const displayNickname = typeof profile?.nickname === 'string' ? profile.nickname : '계정';
 
   return (
-  <div style={{ position: 'relative' }}>
-    <button
-      onClick={() => setOpen(!open)}
-      style={{
-        padding: '6px 14px',
-        border: '1px solid var(--gold)',
-        background: 'transparent',
-        color: 'var(--gold)', // 어두운 헤더 배경에 잘 보이도록 색상 보정
-        fontWeight: 'bold',
-        fontSize: '0.85rem',
-        cursor: 'pointer'
-      }}
-    >
-      {profile?.nickname || '계정'} 전환 ▾
-    </button>
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          padding: '6px 14px',
+          border: '1px solid var(--gold)',
+          background: 'transparent',
+          color: 'var(--gold)',
+          fontWeight: 'bold',
+          fontSize: '0.85rem',
+          cursor: 'pointer'
+        }}
+      >
+        {displayNickname} 전환 ▾
+      </button>
 
     {open && (
       <div style={{
