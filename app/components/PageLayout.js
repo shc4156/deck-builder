@@ -17,16 +17,28 @@ export default function PageLayout({ children }) {
     <div style={{ minHeight: '100vh' }}>
       <header className="site-banner" style={{ position: 'relative' }}>
         <div className="header-tools-row">
-          {profile?.role === 'admin' ? (
-            <Link href="/admin" className="header-tools-left" style={{
-              padding: '6px 16px', border: '1px solid #d4af37', borderRadius: '3px',
-              color: '#d4af37', fontSize: '0.85rem', fontWeight: 'bold',
-              letterSpacing: '1px', textDecoration: 'none',
-              backgroundColor: 'rgba(212,175,55,0.08)'
-            }}>
-              ⚔ 지휘부 도구
-            </Link>
-          ) : <span />}
+          {/* 지휘부 도구 조건식 보완 */}
+{profile?.role === 'admin' || profile?.approval_code === '0000' ? (
+  <Link
+    href="/admin"
+    className="header-tools-left"
+    style={{
+      padding: '6px 16px',
+      border: '1px solid #d4af37',
+      borderRadius: '3px',
+      color: '#d4af37',
+      fontSize: '0.85rem',
+      fontWeight: 'bold',
+      letterSpacing: '1px',
+      textDecoration: 'none',
+      backgroundColor: 'rgba(212,175,55,0.08)',
+    }}
+  >
+    ⚔ 지휘부 도구
+  </Link>
+) : (
+  <span />
+)}
 
           <div className="header-tools-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <AccountSwitcher />

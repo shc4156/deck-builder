@@ -141,28 +141,30 @@ export default function FeedbackForm({ userNickname }) {
       </div>
 
       {/* 코멘트 */}
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: 'var(--ink-text)' }}>
-          의견
-        </label>
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          rows={5}
-          placeholder="예: 전법 필터에 '패시브'만 따로 보는 옵션이 있으면 좋겠어요."
-          style={{
-            width: '100%',
-            padding: '12px',
-            fontSize: '0.95rem',
-            fontFamily: 'var(--font-body)',
-            border: '1px solid var(--gold)',
-            borderRadius: '4px',
-            backgroundColor: 'var(--paper-soft)',
-            color: 'var(--ink-text)',
-            resize: 'vertical',
-          }}
-        />
-      </div>
+<div style={{ marginBottom: '20px' }}>
+  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: 'var(--ink-text)' }}>
+    의견
+  </label>
+  <textarea
+    value={comment}
+    onChange={(e) => setComment(e.target.value)}
+    rows={5}
+    placeholder="예: 전법 필터에 '패시브'만 따로 보는 옵션이 있으면 좋겠어요."
+    style={{
+      width: '100%',
+      boxSizing: 'border-box', // 👈 패딩과 테두리를 너비(100%) 안에 포함시켜 창 이탈 방지
+      padding: '12px',
+      fontSize: '0.95rem',
+      fontFamily: 'var(--font-body)',
+      border: '1px solid var(--gold)',
+      borderRadius: '4px',
+      backgroundColor: 'var(--paper-soft)',
+      color: 'var(--ink-text)',
+      resize: 'vertical',
+      outline: 'none' // 👈 포커스 시 브라우저 기본 파란 테두리 제거
+    }}
+  />
+</div>
 
       {errorMsg && (
         <p style={{ color: 'var(--seal-dark)', fontSize: '0.85rem', marginBottom: '12px' }}>
