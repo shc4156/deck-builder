@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageLayout from '../components/PageLayout'; 
 import { supabase } from '../lib/supabaseClient'; 
+import { saveAccount } from '../lib/accountSwitcher'; // 👈 [추가] 계정 저장 함수 불러오기
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,13 +38,14 @@ export default function LoginPage() {
   const MBR_CODE = process.env.NEXT_PUBLIC_MEMBER_CODE || '1414';
   const GST_CODE = process.env.NEXT_PUBLIC_GUEST_CODE || '9999';
 
-  // 1. 일반 로그인 핸들러
+  // 1. 일반 로그인 핸들러 (수정됨)
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoggingIn(true);
     setLoginMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    // 로그인 시도
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -52,6 +54,27 @@ export default function LoginPage() {
       setLoginMsg('로그인 실패: 이메일이나 비밀번호를 확인해주세요.');
       setIsLoggingIn(false);
     } else {
+      // ✨ [추가] 로그인 성공 시 프로필에서 닉네임 가져오기
+      let nickname = '계정';
+      if (authData?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('nickname')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (profile?.nickname) {
+          nickname = profile.nickname;
+        }
+      }
+
+      // ✨ [추가] 브라우저(localStorage)에 현재 로그인한 계정 정보 저장
+      saveAccount({
+        email: email,
+        password: password,
+        nickname: nickname
+      });
+
       router.push('/');
     }
   };
