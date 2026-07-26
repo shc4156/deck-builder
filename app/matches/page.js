@@ -453,7 +453,7 @@ const isAlreadyPinned = currentPinnedList.some(id => String(id) === targetId);
           {/* 장수 정보 프로필 */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '14px', width: '100%' }}>
             <div style={{ width: '50px', height: '48px', overflow: 'hidden', backgroundColor: 'var(--paper)', border: '2px solid var(--gold)', flexShrink: 0 }}>
-              <img src={dbImageUrl} alt={gSetup.general_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = '/images/generals/default.jpg'; }} />
+              <img src={dbImageUrl} alt={gSetup.general_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.src = '/images/generals/default.jpg'; }} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <span style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--ink-text)', display: 'block', wordBreak: 'break-all' }}>

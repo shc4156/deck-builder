@@ -1118,7 +1118,7 @@ export default function SquadsPage() {
                                 src={hero.image_url || '/images/generals/default.jpg'}
                                 alt={hero.general_name}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                onError={(e) => { e.target.src = '/images/generals/default.jpg'; }}
+                                onError={(e) => { e.target.onerror = null; e.target.src = '/images/generals/default.jpg'; }}
                               />
                             </div>
 
