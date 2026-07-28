@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import PageLayout from '../../components/PageLayout';
 
 export default function UploadTacticPage() {
   const [tactics, setTactics] = useState([]);
@@ -93,45 +94,49 @@ export default function UploadTacticPage() {
   }
 
   return (
-    <div style={{ padding: '40px', backgroundColor: '#f4ece0' }}>
-      <h1>전법 이미지 일괄 업로드</h1>
-      <p style={{ color: '#5d4037', fontSize: '0.9rem' }}>
-        파일명이 전법 이름과 정확히 일치해야 합니다 (예: 칠군수몰.png)
-      </p>
+    <PageLayout>
+      <div style={{ padding: '40px' }}>
+        <h1 className="classic-heading text-2xl font-bold">전법 이미지 일괄 업로드</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          파일명이 전법 이름과 정확히 일치해야 합니다 (예: 칠군수몰.png)
+        </p>
 
-      <input
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={(e) => setImageFiles(Array.from(e.target.files))}
-      />
-      <p style={{ fontSize: '0.85rem', color: '#8d6e63' }}>{imageFiles.length}개 파일 선택됨</p>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => setImageFiles(Array.from(e.target.files))}
+        />
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{imageFiles.length}개 파일 선택됨</p>
 
-      <br />
-      <button
-        onClick={handleBulkUpload}
-        disabled={isUploading}
-        style={{ padding: '10px 20px', cursor: isUploading ? 'not-allowed' : 'pointer' }}
-      >
-        {isUploading ? '업로드 중...' : '일괄 업로드 시작'}
-      </button>
+        <br />
+        <button
+          className="seal-button"
+          onClick={handleBulkUpload}
+          disabled={isUploading}
+          style={{ padding: '10px 20px', cursor: isUploading ? 'not-allowed' : 'pointer' }}
+        >
+          {isUploading ? '업로드 중...' : '일괄 업로드 시작'}
+        </button>
 
-      {results.length > 0 && (
-        <div style={{ marginTop: '30px', maxWidth: '600px' }}>
-          <h3>진행 결과 ({results.filter(r => r.status === 'success').length}/{results.length} 성공)</h3>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {results.map((r, i) => (
-              <li key={i} style={{
-                padding: '8px 12px', marginBottom: '4px', borderRadius: '4px',
-                backgroundColor: r.status === 'success' ? '#e8f5e9' : r.status === 'unmatched' ? '#fff3e0' : '#ffebee',
-                fontSize: '0.9rem'
-              }}>
-                <strong>{r.file}</strong>: {r.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+        {results.length > 0 && (
+          <div style={{ marginTop: '30px', maxWidth: '600px' }}>
+            <h3 style={{ color: 'var(--text-primary)' }}>진행 결과 ({results.filter(r => r.status === 'success').length}/{results.length} 성공)</h3>
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {results.map((r, i) => (
+                <li key={i} style={{
+                  padding: '8px 12px', marginBottom: '4px', borderRadius: '4px',
+                  backgroundColor: r.status === 'success' ? 'rgba(78,154,99,0.15)' : r.status === 'unmatched' ? 'rgba(184,135,58,0.15)' : 'rgba(192,69,61,0.15)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem'
+                }}>
+                  <strong>{r.file}</strong>: {r.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </PageLayout>
   );
 }

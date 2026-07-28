@@ -65,7 +65,7 @@ export default function CastleLocationInput({ name, onNameChange, coord, onCoord
               padding: '3px 8px',
               whiteSpace: 'nowrap',
               color: '#fff',
-              backgroundColor: coord.auto ? 'var(--jade)' : '#b8935a',
+              backgroundColor: coord.auto ? 'var(--jade)' : 'var(--accent)',
             }}
           >
             {/* ⬇️ 여기가 수정된 부분: x.y → (x,y) 형식으로 표시 (인게임 좌표 인식 형식과 통일) */}

@@ -205,127 +205,152 @@ export default function LoginPage() {
     padding: '10px 12px',
     fontSize: '0.95rem',
     fontFamily: 'var(--font-body)',
-    border: '1px solid var(--gold)',
-    borderRadius: '4px',
-    backgroundColor: 'var(--paper-soft)',
-    color: 'var(--ink-text)',
+    border: '0.5px solid var(--border-strong)',
+    borderRadius: '8px',
+    backgroundColor: 'var(--bg-surface)',
+    color: 'var(--text-primary)',
     outline: 'none',
     boxSizing: 'border-box',
     marginBottom: '12px'
   };
 
+  const primaryButtonStyle = {
+    width: '100%',
+    marginTop: '8px',
+    padding: '11px',
+    fontSize: '0.95rem',
+    fontWeight: 700,
+    color: '#14171D',
+    background: 'var(--accent)',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+  };
+
   return (
     <PageLayout>
-      <div style={{ padding: '25px', minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '8vh' }}>
-        
-        <div className="scroll-panel" style={{ width: '100%', maxWidth: '420px', position: 'relative' }}>
-          
-          {/* 로그인 / 회원가입 탭 전환 */}
-          <div style={{ display: 'flex', marginBottom: '24px', borderBottom: '2px solid rgba(139,94,52,0.2)' }}>
-            <button 
-              type="button"
-              onClick={() => { setIsLoginMode(true); setSignupMsg(''); }}
-              style={{ flex: 1, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.05rem', fontWeight: isLoginMode ? 'bold' : 'normal', color: isLoginMode ? 'var(--seal-dark)' : 'rgba(0,0,0,0.5)', borderBottom: isLoginMode ? '3px solid var(--seal-dark)' : 'none' }}
-            >
-              막사 입장 (로그인)
-            </button>
-            <button 
-              type="button"
-              onClick={() => { setIsLoginMode(false); setLoginMsg(''); setIsForgotOpen(false); }}
-              style={{ flex: 1, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.05rem', fontWeight: !isLoginMode ? 'bold' : 'normal', color: !isLoginMode ? 'var(--seal-dark)' : 'rgba(0,0,0,0.5)', borderBottom: !isLoginMode ? '3px solid var(--seal-dark)' : 'none' }}
-            >
-              새 막사 개설
-            </button>
+      <div style={{ padding: '25px', minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '8vh', background: 'var(--bg-page)' }}>
+
+        <div style={{ width: '100%', maxWidth: '420px', position: 'relative' }}>
+
+          <div style={{ marginBottom: '22px', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 4px', fontSize: '11px', color: 'var(--accent)', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>
+              SANGUOZHI · DECK OPS
+            </p>
+            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 500, color: 'var(--text-primary)' }}>천하결전 덱 빌더</h1>
           </div>
 
-          {isLoginMode ? (
-            <>
-              {/* === 로그인 영역 === */}
-              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column' }}>
-                <input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
-                <input type="password" placeholder="비밀번호" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
-                <button className="seal-button" type="submit" disabled={isLoggingIn} style={{ width: '100%', marginTop: '8px' }}>
-                  {isLoggingIn ? '입장 중...' : '로그인'}
-                </button>
-              </form>
+          <div style={{
+            background: 'var(--bg-surface)', border: '0.5px solid var(--border)', borderRadius: '14px', padding: '22px',
+          }}>
 
-              {loginMsg && (
-                <p style={{ marginTop: '12px', color: 'var(--seal-dark)', fontSize: '0.9rem', textAlign: 'center' }}>
-                  {loginMsg}
-                </p>
-              )}
+            {/* 로그인 / 회원가입 탭 전환 */}
+            <div style={{ display: 'flex', marginBottom: '20px', borderBottom: '0.5px solid var(--border)' }}>
+              <button
+                type="button"
+                onClick={() => { setIsLoginMode(true); setSignupMsg(''); }}
+                style={{ flex: 1, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.95rem', fontWeight: isLoginMode ? 700 : 400, color: isLoginMode ? 'var(--accent)' : 'var(--text-muted)', borderBottom: isLoginMode ? '2px solid var(--accent)' : 'none' }}
+              >
+                막사 입장 (로그인)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsLoginMode(false); setLoginMsg(''); setIsForgotOpen(false); }}
+                style={{ flex: 1, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.95rem', fontWeight: !isLoginMode ? 700 : 400, color: !isLoginMode ? 'var(--accent)' : 'var(--text-muted)', borderBottom: !isLoginMode ? '2px solid var(--accent)' : 'none' }}
+              >
+                새 막사 개설
+              </button>
+            </div>
 
-              <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px dashed rgba(139,94,52,0.4)' }} />
+            {isLoginMode ? (
+              <>
+                {/* === 로그인 영역 === */}
+                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column' }}>
+                  <input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
+                  <input type="password" placeholder="비밀번호" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
+                  <button type="submit" disabled={isLoggingIn} style={{ ...primaryButtonStyle, opacity: isLoggingIn ? 0.6 : 1 }}>
+                    {isLoggingIn ? '입장 중...' : '로그인'}
+                  </button>
+                </form>
 
-              <div style={{ textAlign: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => { setIsForgotOpen(!isForgotOpen); setForgotStatusMsg(''); }}
-                  style={{ background: 'none', border: 'none', color: 'var(--seal-dark)', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}
-                >
-                  비밀번호를 잊으셨나요?
-                </button>
-              </div>
-
-              {isForgotOpen && (
-                <div style={{ marginTop: '20px', padding: '16px', border: '1px solid var(--gold)', borderRadius: '4px', backgroundColor: 'var(--paper-soft)' }}>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--ink-text)' }}>
-                    🔑 비밀번호 재설정
+                {loginMsg && (
+                  <p style={{ marginTop: '12px', color: 'var(--grade-s)', fontSize: '0.85rem', textAlign: 'center' }}>
+                    {loginMsg}
                   </p>
-                  <input
-                    type="text"
-                    placeholder="가입 시 사용한 닉네임 입력"
-                    value={forgotNickname}
-                    onChange={(e) => setForgotNickname(e.target.value)}
-                    style={inputStyle}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendResetEmail()}
-                  />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button type="button" className="seal-button" onClick={handleSendResetEmail} disabled={isSending} style={{ flex: 1 }}>
-                      {isSending ? '발송 중...' : '재설정 링크 전송'}
-                    </button>
-                  </div>
-                  {forgotStatusMsg && (
-                    <p style={{ fontSize: '0.85rem', marginTop: '12px', color: 'var(--seal-dark)', lineHeight: '1.4' }}>
-                      {forgotStatusMsg}
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {/* === 회원가입 영역 === */}
-              <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column' }}>
-                <input type="email" placeholder="사용할 이메일" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} style={inputStyle} required />
-                <input type="password" placeholder="비밀번호 (6자 이상)" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} style={inputStyle} required minLength={6} />
-                <input type="text" placeholder="닉네임 (삼국지용 닉네임)" value={signupNickname} onChange={(e) => setSignupNickname(e.target.value)} style={inputStyle} required />
-                <input type="text" placeholder="승인 코드 (지휘부/일반/외부)" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} style={inputStyle} required />
-                
-                {/* 외부 인원 코드를 입력했을 때만 나타나는 추가 입력란 */}
-                {accessCode === GST_CODE && (
-                  <div style={{ padding: '12px', backgroundColor: 'rgba(139,41,31,0.04)', border: '1px solid var(--gold)', borderRadius: '4px', marginBottom: '12px' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: 'var(--seal-dark)' }}>
-                      외부 유저 환영합니다! 소속 정보를 기입해 주세요.
-                    </p>
-                    <input type="text" placeholder="소속 서버 (예: 1서버)" value={serverName} onChange={(e) => setServerName(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} required={accessCode === GST_CODE} />
-                    <input type="text" placeholder="소속 맹 이름 (예: 무적맹)" value={allianceName} onChange={(e) => setAllianceName(e.target.value)} style={{ ...inputStyle, marginBottom: '0' }} required={accessCode === GST_CODE} />
-                  </div>
                 )}
 
-                <button className="seal-button" type="submit" disabled={isSigningUp} style={{ width: '100%', marginTop: '8px' }}>
-                  {isSigningUp ? '개설 중...' : '막사 개설하기'}
-                </button>
-              </form>
+                <hr style={{ margin: '22px 0', border: 'none', borderTop: '0.5px dashed var(--border)' }} />
 
-              {signupMsg && (
-                <p style={{ marginTop: '16px', color: 'var(--seal-dark)', fontSize: '0.9rem', textAlign: 'center', lineHeight: '1.4' }}>
-                  {signupMsg}
-                </p>
-              )}
-            </>
-          )}
+                <div style={{ textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setIsForgotOpen(!isForgotOpen); setForgotStatusMsg(''); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline' }}
+                  >
+                    비밀번호를 잊으셨나요?
+                  </button>
+                </div>
 
+                {isForgotOpen && (
+                  <div style={{ marginTop: '18px', padding: '14px', border: '0.5px solid var(--border-strong)', borderRadius: '10px', backgroundColor: 'var(--bg-page)' }}>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                      🔑 비밀번호 재설정
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="가입 시 사용한 닉네임 입력"
+                      value={forgotNickname}
+                      onChange={(e) => setForgotNickname(e.target.value)}
+                      style={inputStyle}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendResetEmail()}
+                    />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="button" onClick={handleSendResetEmail} disabled={isSending} style={{ ...primaryButtonStyle, marginTop: 0, flex: 1, opacity: isSending ? 0.6 : 1 }}>
+                        {isSending ? '발송 중...' : '재설정 링크 전송'}
+                      </button>
+                    </div>
+                    {forgotStatusMsg && (
+                      <p style={{ fontSize: '0.8rem', marginTop: '10px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                        {forgotStatusMsg}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* === 회원가입 영역 === */}
+                <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column' }}>
+                  <input type="email" placeholder="사용할 이메일" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} style={inputStyle} required />
+                  <input type="password" placeholder="비밀번호 (6자 이상)" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} style={inputStyle} required minLength={6} />
+                  <input type="text" placeholder="닉네임 (삼국지용 닉네임)" value={signupNickname} onChange={(e) => setSignupNickname(e.target.value)} style={inputStyle} required />
+                  <input type="text" placeholder="승인 코드 (지휘부/일반/외부)" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} style={inputStyle} required />
+
+                  {/* 외부 인원 코드를 입력했을 때만 나타나는 추가 입력란 */}
+                  {accessCode === GST_CODE && (
+                    <div style={{ padding: '12px', backgroundColor: 'var(--bg-page)', border: '0.5px solid var(--border-strong)', borderRadius: '8px', marginBottom: '12px' }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        외부 유저 환영합니다! 소속 정보를 기입해 주세요.
+                      </p>
+                      <input type="text" placeholder="소속 서버 (예: 1서버)" value={serverName} onChange={(e) => setServerName(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} required={accessCode === GST_CODE} />
+                      <input type="text" placeholder="소속 맹 이름 (예: 무적맹)" value={allianceName} onChange={(e) => setAllianceName(e.target.value)} style={{ ...inputStyle, marginBottom: '0' }} required={accessCode === GST_CODE} />
+                    </div>
+                  )}
+
+                  <button type="submit" disabled={isSigningUp} style={{ ...primaryButtonStyle, opacity: isSigningUp ? 0.6 : 1 }}>
+                    {isSigningUp ? '개설 중...' : '막사 개설하기'}
+                  </button>
+                </form>
+
+                {signupMsg && (
+                  <p style={{ marginTop: '14px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', lineHeight: '1.4' }}>
+                    {signupMsg}
+                  </p>
+                )}
+              </>
+            )}
+
+          </div>
         </div>
       </div>
     </PageLayout>

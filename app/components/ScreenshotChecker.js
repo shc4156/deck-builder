@@ -63,17 +63,20 @@ export default function ScreenshotChecker({
   const tacMatcher = useTextMatcher(tactics, selectedTactics, toggleTactic, '전법');
 
   return (
-    <div className="scroll-panel" style={{ padding: '18px', marginBottom: '20px' }}>
-      <h3 className="classic-heading" style={{ fontSize: '1.1rem', marginBottom: '10px' }}>
+    <div style={{
+      padding: '18px', marginBottom: '20px', borderRadius: 12,
+      background: 'var(--bg-surface)', border: '0.5px solid var(--border)',
+    }}>
+      <h3 style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '10px', marginTop: 0 }}>
         📋 텍스트로 한 번에 체크
       </h3>
-      <p style={{ fontSize: '0.85rem', color: 'var(--ink-text)', opacity: 0.75, marginBottom: '14px' }}>
+      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
         보유하신 장수/전법 이름을 쉼표(,)로 구분해서 입력하면 한 번에 체크됩니다. (예: 유비,관우,장비)
       </p>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
         <div style={{ flex: '1 1 260px' }}>
-          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
+          <label style={{ display: 'block', fontWeight: 500, fontSize: 12, marginBottom: '6px', color: 'var(--text-secondary)' }}>
             장수 목록 (쉼표 구분)
           </label>
           <textarea
@@ -85,8 +88,11 @@ export default function ScreenshotChecker({
               width: '100%',
               padding: '8px',
               fontSize: '0.9rem',
-              borderRadius: '4px',
+              borderRadius: '6px',
               resize: 'vertical',
+              background: 'var(--bg-page)',
+              border: '0.5px solid var(--border-strong)',
+              color: 'var(--text-primary)',
             }}
           />
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -94,10 +100,11 @@ export default function ScreenshotChecker({
               onClick={genMatcher.handleApply}
               style={{
                 padding: '6px 14px',
-                borderRadius: '4px',
-                background: 'var(--jade)',
-                color: '#fff',
-                fontWeight: 'bold',
+                borderRadius: '6px',
+                background: 'var(--accent)',
+                color: 'var(--accent-on)',
+                fontWeight: 500,
+                fontSize: 12,
                 border: 'none',
                 cursor: 'pointer',
               }}
@@ -108,10 +115,11 @@ export default function ScreenshotChecker({
               onClick={genMatcher.handleClear}
               style={{
                 padding: '6px 14px',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 background: 'transparent',
-                border: '1px solid var(--seal-dark)',
-                color: 'var(--seal-dark)',
+                border: '0.5px solid var(--border-strong)',
+                color: 'var(--text-secondary)',
+                fontSize: 12,
                 cursor: 'pointer',
               }}
             >
@@ -119,14 +127,14 @@ export default function ScreenshotChecker({
             </button>
           </div>
           {genMatcher.resultMsg && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--jade)', fontWeight: 'bold', marginTop: '8px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 500, marginTop: '8px' }}>
               {genMatcher.resultMsg}
             </p>
           )}
         </div>
 
         <div style={{ flex: '1 1 260px' }}>
-          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>
+          <label style={{ display: 'block', fontWeight: 500, fontSize: 12, marginBottom: '6px', color: 'var(--text-secondary)' }}>
             전법 목록 (쉼표 구분)
           </label>
           <textarea
@@ -138,8 +146,11 @@ export default function ScreenshotChecker({
               width: '100%',
               padding: '8px',
               fontSize: '0.9rem',
-              borderRadius: '4px',
+              borderRadius: '6px',
               resize: 'vertical',
+              background: 'var(--bg-page)',
+              border: '0.5px solid var(--border-strong)',
+              color: 'var(--text-primary)',
             }}
           />
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -147,10 +158,11 @@ export default function ScreenshotChecker({
               onClick={tacMatcher.handleApply}
               style={{
                 padding: '6px 14px',
-                borderRadius: '4px',
-                background: 'var(--jade)',
-                color: '#fff',
-                fontWeight: 'bold',
+                borderRadius: '6px',
+                background: 'var(--accent)',
+                color: 'var(--accent-on)',
+                fontWeight: 500,
+                fontSize: 12,
                 border: 'none',
                 cursor: 'pointer',
               }}
@@ -161,10 +173,11 @@ export default function ScreenshotChecker({
               onClick={tacMatcher.handleClear}
               style={{
                 padding: '6px 14px',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 background: 'transparent',
-                border: '1px solid var(--seal-dark)',
-                color: 'var(--seal-dark)',
+                border: '0.5px solid var(--border-strong)',
+                color: 'var(--text-secondary)',
+                fontSize: 12,
                 cursor: 'pointer',
               }}
             >
@@ -172,7 +185,7 @@ export default function ScreenshotChecker({
             </button>
           </div>
           {tacMatcher.resultMsg && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--jade)', fontWeight: 'bold', marginTop: '8px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 500, marginTop: '8px' }}>
               {tacMatcher.resultMsg}
             </p>
           )}

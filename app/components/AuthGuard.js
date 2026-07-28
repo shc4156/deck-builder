@@ -33,18 +33,25 @@ export default function AuthGuard({ children }) {
   if (isChecking && pathname !== '/login') {
     return (
       <div
-        className="classic-title"
         style={{
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
+          gap: '10px',
           minHeight: '100vh',
-          fontSize: '1.3rem',
-          letterSpacing: '0.05em',
-          background: 'var(--ink-bg)'
+          background: 'var(--bg-page)',
         }}
       >
-        인증 확인 중...
+        <p style={{
+          margin: 0, fontSize: '11px', color: 'var(--accent)',
+          letterSpacing: '0.05em', fontFamily: 'var(--font-mono)',
+        }}>
+          SANGUOZHI · DECK OPS
+        </p>
+        <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+          인증 확인 중...
+        </p>
       </div>
     );
   }

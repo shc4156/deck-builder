@@ -43,13 +43,14 @@ export default function AccountSwitcher() {
       <button
         onClick={() => setOpen(!open)}
         style={{
-          padding: '6px 14px',
-    border: '1px solid var(--gold)',
-    background: 'transparent',
-    color: '#ffffff', // 👈 원하는 색상으로 변경 (예: #ffffff, #000000, #d4af37 등)
-    fontWeight: 'bold',
-    fontSize: '0.85rem',
-    cursor: 'pointer'
+          padding: '4px 10px',
+          border: '0.5px solid var(--border-strong)',
+          borderRadius: 6,
+          background: 'transparent',
+          color: 'var(--text-secondary)',
+          fontWeight: 500,
+          fontSize: 11,
+          cursor: 'pointer'
         }}
       >
         {displayNickname} 전환 ▾
@@ -58,8 +59,9 @@ export default function AccountSwitcher() {
       {open && (
         <div style={{
           position: 'absolute', top: '100%', right: 0, marginTop: '4px',
-          backgroundColor: 'var(--paper-soft)', border: '1px solid var(--gold)',
-          minWidth: '180px', zIndex: 10, boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
+          backgroundColor: 'var(--bg-surface)', border: '0.5px solid var(--border-strong)',
+          borderRadius: 8, minWidth: '180px', zIndex: 10, boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
         }}>
           {accounts.map((acc, index) => {
             const accountEmail = typeof acc?.email === 'string' ? acc.email : (typeof acc === 'string' ? acc : '');
@@ -74,17 +76,16 @@ export default function AccountSwitcher() {
     padding: '10px 14px',
     cursor: 'pointer',
     display: 'flex',
-    justify: 'space-between',
-    alignItems: 'center'
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '0.5px solid var(--border)',
   }}
 >
-  {/* 🟢 계정 닉네임/이메일 글자 색상 지정 */}
-  <span style={{ color: '#222222' }}>{String(displayName)}</span>
+  <span style={{ color: 'var(--text-primary)', fontSize: 13 }}>{String(displayName)}</span>
 
-  {/* 🟢 삭제 버튼 글자 색상 지정 */}
   <button 
     onClick={(e) => handleRemoveAccount(e, accountEmail)}
-    style={{ color: '#ff4d4f', border: 'none', background: 'transparent', cursor: 'pointer' }}
+    style={{ color: '#D9534F', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12 }}
   >
     삭제
   </button>
@@ -98,10 +99,10 @@ export default function AccountSwitcher() {
               padding: '10px 14px',
               cursor: 'pointer',
               textAlign: 'center',
-              fontSize: '0.85rem',
-              fontWeight: 'bold',
-              color: 'var(--gold)',
-              backgroundColor: 'rgba(212,175,55,0.05)'
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              color: 'var(--accent)',
+              backgroundColor: 'rgba(184,135,58,0.08)'
             }}
           >
             + 다른 계정으로 로그인

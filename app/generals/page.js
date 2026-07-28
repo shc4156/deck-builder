@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient'; 
 import GeneralCard from '../components/GeneralCard';
 import PageLayout from '../components/PageLayout';
 
@@ -11,13 +10,11 @@ export default function GeneralsPage() {
 
   useEffect(() => {
     async function fetchData() {
-      // 장수 데이터 불러오기 (가나다순 정렬 적용)
-      const { data: genData } = await supabase
-        .from('generals')
-        .select('*')
-        .order('name', { ascending: true });
-        
-      if (genData) setGenerals(genData);
+      // 이 페이지만 따로 Supabase를 조회하지 않고, 다른 탭들과 같은
+      // /api/deck-assets 캐싱 API(1시간 revalidate)를 재사용한다.
+      const res = await fetch('/api/deck-assets');
+      const data = await res.json();
+      setGenerals(data.generals || []);
     }
     fetchData();
   }, []);
@@ -36,40 +33,35 @@ export default function GeneralsPage() {
 
   return (
     <PageLayout>
-      <div style={{ marginBottom: '20px' }}>
-        <h1 className="text-3xl font-bold text-gray-800">나의 장수 도감</h1>
-      </div>
+      <header style={{ padding: '20px var(--pad-page) 14px', borderBottom: '0.5px solid var(--border)' }}>
+        <p className="header-eyebrow" style={{ margin: '0 0 4px' }}>SANGUOZHI · DECK OPS</p>
+        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 500, color: 'var(--text-primary)' }}>나의 장수 도감</h1>
+      </header>
 
-      <div className="mb-8 flex space-x-2">
-        {factions.map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '5px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              backgroundColor: filter === f ? '#e74c3c' : '#bdc3c7',
-              color: filter === f ? '#fff' : '#2c3e50'
-            }}
-            
-          >
-            {f}
-          </button>
-        ))}
-      </div>
+      <div style={{ padding: '16px var(--pad-page) 0' }}>
+        <div style={{ marginBottom: '20px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {factions.map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={filter === f ? 'chip chip--active' : 'chip'}
+              style={{ cursor: 'pointer' }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
-        {filteredGenerals.map((gen) => (
-          <GeneralCard 
-            key={gen.id} 
-            general={gen} 
-            isSelected={selectedIds.includes(gen.id)} 
-            onSelect={toggleSelect} 
-          />
-        ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px', paddingBottom: '20px' }}>
+          {filteredGenerals.map((gen) => (
+            <GeneralCard 
+              key={gen.id} 
+              general={gen} 
+              isSelected={selectedIds.includes(gen.id)} 
+              onSelect={toggleSelect} 
+            />
+          ))}
+        </div>
       </div>
     </PageLayout>
   );

@@ -389,7 +389,7 @@ export default function WeeklyReportPage() {
                       <stop offset="100%" stopColor="var(--gold)" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(43,35,24,0.12)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
                   <XAxis dataKey="dateLabel" tick={{ fill: 'var(--ink-text)', fontSize: 12 }} />
                   <YAxis tick={{ fill: 'var(--ink-text)', fontSize: 12 }} />
                   <Tooltip contentStyle={{ background: 'var(--paper-soft)', border: '1px solid var(--gold)', fontSize: '0.85rem' }} />
@@ -409,7 +409,7 @@ export default function WeeklyReportPage() {
                 </p>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={dailySnapshots}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(43,35,24,0.12)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
                     <XAxis dataKey="dateLabel" tick={{ fill: 'var(--ink-text)', fontSize: 12 }} />
                     <YAxis tick={{ fill: 'var(--ink-text)', fontSize: 12 }} allowDecimals={false} />
                     <Tooltip contentStyle={{ background: 'var(--paper-soft)', border: '1px solid var(--gold)', fontSize: '0.85rem' }} />
@@ -427,7 +427,7 @@ export default function WeeklyReportPage() {
                 </p>
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={dailySnapshots}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(43,35,24,0.12)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.12)" />
                     <XAxis dataKey="dateLabel" tick={{ fill: 'var(--ink-text)', fontSize: 12 }} />
                     <YAxis tick={{ fill: 'var(--ink-text)', fontSize: 12 }} allowDecimals={false} />
                     <Tooltip contentStyle={{ background: 'var(--paper-soft)', border: '1px solid var(--gold)', fontSize: '0.85rem' }} />

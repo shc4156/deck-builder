@@ -1,7 +1,7 @@
 import { tacticRoleColors, tacticRoleLabels, tagLabels } from '../../styles/roleColors';
 
 export default function TacticCard({ tactic, isSelected, onSelect }) {
-  const roleStyle = tacticRoleColors[tactic.role] || { bg: 'rgba(142,115,91,0.15)', border: '#8e735b', text: '#5c4a3a' };
+  const roleStyle = tacticRoleColors[tactic.role] || { bg: 'rgba(142,115,91,0.15)', border: '#8e735b', text: '#D9C9B0' };
   const roleLabel = tacticRoleLabels[tactic.role] || tactic.role;
   const tags = tactic.tags || [];
 
@@ -10,7 +10,7 @@ export default function TacticCard({ tactic, isSelected, onSelect }) {
         backgroundImage: `linear-gradient(rgba(28,24,21,0.75), rgba(28,24,21,0.75)), url('${tactic.image_url}')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        color: 'var(--paper-soft)',
+        color: 'var(--text-primary)',
         border: '3px solid var(--seal)',
         boxShadow: '0 0 0 3px rgba(166,50,42,0.25)',
         textShadow: '1px 1px 3px #000'
@@ -64,9 +64,9 @@ export default function TacticCard({ tactic, isSelected, onSelect }) {
           {tags.slice(0, 3).map((tag, idx) => (
             <span key={idx} style={{
               fontSize: '10px', padding: '1px 6px', borderRadius: '2px',
-              backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(43,35,24,0.06)',
-              border: `1px solid ${isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(43,35,24,0.2)'}`,
-              color: isSelected ? 'var(--paper-soft)' : 'rgba(43,35,24,0.65)'
+              backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.2)'}`,
+              color: isSelected ? 'var(--text-primary)' : 'rgba(255,255,255,0.65)'
             }}>
               {tagLabels[tag] || tag}
             </span>

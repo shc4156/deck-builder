@@ -1,18 +1,19 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import GeneralCard from './GeneralCard';
 import TacticCard from './TacticCard';
 import { inferGeneralRole, inferTacticRole, findRecommendedGenerals } from '../../data/roleInference';
 import GlossaryText from './GlossaryText';
 import GlossaryModal from './GlossaryModal';
 
-export default function Dictionary({ generals, tactics, activeSynergies, selectedGenerals, selectedTactics }) {
+// synergyMaster는 이제 이 컴포넌트가 직접 Supabase에서 조회하지 않고,
+// 부모(admin/feedback/page.js)가 useDeckAssets()로 이미 받아온 synergies를
+// 그대로 넘겨받아 쓴다(중복 조회 제거).
+export default function Dictionary({ generals, tactics, activeSynergies, selectedGenerals, selectedTactics, synergyMaster = [] }) {
   const [glossaryTerm, setGlossaryTerm] = useState(null);
   const [dictSubTab, setDictSubTab] = useState('generals');
   const [detailGeneral, setDetailGeneral] = useState(null);
   const [detailTactic, setDetailTactic] = useState(null);
-  const [synergyMaster, setSynergyMaster] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -20,17 +21,6 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    async function loadSynergies() {
-      const { data } = await supabase
-        .from('synergies')
-        .select('name, req_count, members, effect')
-        .order('name', { ascending: true });
-      if (data) setSynergyMaster(data);
-    }
-    loadSynergies();
   }, []);
 
   // 상세 패널 내용물 (장수)
@@ -231,7 +221,10 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
 
               const synergyStatus = synergyMaster.map(s => {
                 const matchedMembers = s.members.filter(m => selectedNames.includes(m));
-                return { ...s, matchedMembers, isComplete: matchedMembers.length >= s.req_count };
+                const progressPercent = s.req_count > 0
+                  ? Math.min(100, Math.round((matchedMembers.length / s.req_count) * 100))
+                  : 0;
+                return { ...s, matchedMembers, isComplete: matchedMembers.length >= s.req_count, progressPercent };
               });
 
               synergyStatus.sort((a, b) => {
@@ -240,11 +233,14 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
               });
 
               const completeCount = synergyStatus.filter(s => s.isComplete).length;
+              const avgPercent = synergyStatus.length > 0
+                ? Math.round(synergyStatus.reduce((sum, s) => sum + s.progressPercent, 0) / synergyStatus.length)
+                : 0;
 
               return (
                 <>
                   <h2 className="classic-heading text-2xl font-bold mb-4">
-                    인연 목록 ({completeCount}/{synergyStatus.length}개 결성됨)
+                    인연 목록 ({completeCount}/{synergyStatus.length}개 결성됨 · 평균 진행도 {avgPercent}%)
                   </h2>
                   <div className="synergy-grid">
                     {synergyStatus.map(synergy => (
@@ -271,9 +267,21 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
                           {synergy.isComplete && <span style={{ color: 'var(--gold)' }}>✔</span>}
                           {synergy.name}
                           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--seal-dark)', opacity: 0.8 }}>
-                            ({synergy.matchedMembers.length}/{synergy.req_count}인 결의)
+                            ({synergy.matchedMembers.length}/{synergy.req_count}인 결의 · {synergy.progressPercent}%)
                           </span>
                         </h3>
+
+                        {/* 완성도 진행 바 */}
+                        <div style={{
+                          height: '6px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.12)',
+                          overflow: 'hidden', marginBottom: '12px'
+                        }}>
+                          <div style={{
+                            width: `${synergy.progressPercent}%`, height: '100%',
+                            backgroundColor: synergy.isComplete ? 'var(--gold)' : 'var(--seal)',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
 
                         {/* 구성 무장: 얼굴 썸네일 + 이름 칩 */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
@@ -284,8 +292,8 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
                               <div key={m} style={{
                                 display: 'flex', alignItems: 'center', gap: '5px',
                                 padding: '3px 9px 3px 3px', borderRadius: '999px',
-                                backgroundColor: matched ? 'rgba(166,50,42,0.08)' : 'rgba(43,35,24,0.05)',
-                                border: `1px solid ${matched ? 'var(--seal)' : 'rgba(43,35,24,0.18)'}`,
+                                backgroundColor: matched ? 'rgba(166,50,42,0.08)' : 'rgba(255,255,255,0.05)',
+                                border: `1px solid ${matched ? 'var(--seal)' : 'rgba(255,255,255,0.18)'}`,
                                 opacity: matched ? 1 : 0.55
                               }}>
                                 {gen?.image_url ? (
@@ -296,13 +304,13 @@ export default function Dictionary({ generals, tactics, activeSynergies, selecte
                                       width: '24px', height: '24px', borderRadius: '50%',
                                       objectFit: 'cover',
                                       filter: matched ? 'none' : 'grayscale(70%)',
-                                      border: `1px solid ${matched ? 'var(--gold)' : 'rgba(43,35,24,0.25)'}`
+                                      border: `1px solid ${matched ? 'var(--gold)' : 'rgba(255,255,255,0.25)'}`
                                     }}
                                   />
                                 ) : (
                                   <span style={{
                                     width: '24px', height: '24px', borderRadius: '50%',
-                                    backgroundColor: 'rgba(43,35,24,0.12)', display: 'inline-flex',
+                                    backgroundColor: 'rgba(255,255,255,0.12)', display: 'inline-flex',
                                     alignItems: 'center', justifyContent: 'center',
                                     fontSize: '0.7rem', color: 'var(--ink-text)'
                                   }}>

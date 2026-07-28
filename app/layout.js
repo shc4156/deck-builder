@@ -2,10 +2,11 @@ import './globals.css';
 import AuthGuard from './components/AuthGuard';
 import { ProfileProvider } from './components/ProfileContext';
 import InstallBanner from './components/InstallBanner';
+import 'pretendard/dist/web/static/pretendard.css';
 
 // 1. viewport 객체에 모바일 환경 옵션 보완
 export const viewport = {
-  themeColor: '#8b1a1a',
+  themeColor: '#0B0D11',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1, // 모바일에서 터치 조작 시 원치 않는 화면 확대 방지
@@ -16,6 +17,10 @@ export const metadata = {
   title: '천하결전 덱 빌더',
   description: '삼국지 천하결전 덱 빌딩 웹앱',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon-32.png',
+    apple: '/favicon-180.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -33,5 +38,6 @@ export default function RootLayout({ children }) {
         </AuthGuard>
       </body>
     </html>
+    
   );
 }

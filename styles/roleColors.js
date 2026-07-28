@@ -1,19 +1,25 @@
 // styles/roleColors.js
 // 전법 role, 장수 primary_role에 공통으로 쓰는 배지 색상 매핑
 // tactics.role / generals.primary_role 값과 1:1 대응
+//
+// ※ 다크 지휘실 테마 통일: text 색상은 원래 밝은 종이(paper-soft) 카드 배경을
+//   기준으로 잡힌 어두운 톤이었습니다. 카드 배경이 다크 서피스(var(--paper-soft),
+//   이제 어두운 색)로 바뀌면서 어두운 텍스트가 안 보이게 되어, border와 같은
+//   색상 계열을 유지하면서 밝기만 끌어올린 톤으로 교체했습니다. bg/border는
+//   다크 배경 위에서도 그대로 잘 보여서 유지했습니다.
 
 export const tacticRoleColors = {
-  '딜_병기': { bg: 'rgba(166,50,42,0.15)', border: '#a6322a', text: '#7a241d' },
-  '딜_책략': { bg: 'rgba(44,74,107,0.15)', border: '#2c4a6b', text: '#1f3450' },
-  '딜_혼합': { bg: 'rgba(139,38,38,0.12)', border: '#8b2626', text: '#6b1c1c' },
-  '힐': { bg: 'rgba(45,90,39,0.15)', border: '#2d5a27', text: '#1f4019' },
-  '버프_아군': { bg: 'rgba(184,147,90,0.2)', border: '#b8935a', text: '#7a5f34' },
-  '버프_자신': { bg: 'rgba(184,147,90,0.15)', border: '#b8935a', text: '#7a5f34' },
-  '디버프': { bg: 'rgba(90,45,90,0.15)', border: '#5a2d5a', text: '#3f1f3f' },
-  '방어_아군': { bg: 'rgba(90,110,120,0.15)', border: '#5a6e78', text: '#3f4d54' },
-  '방어_자신': { bg: 'rgba(90,110,120,0.12)', border: '#5a6e78', text: '#3f4d54' },
-  '도발': { bg: 'rgba(184,134,11,0.18)', border: '#b8860b', text: '#7a5907' },
-  '지원_복합': { bg: 'rgba(107,76,107,0.15)', border: '#6b4c6b', text: '#4a344a' }
+  '딜_병기': { bg: 'rgba(166,50,42,0.15)', border: '#a6322a', text: '#E2897C' },
+  '딜_책략': { bg: 'rgba(44,74,107,0.15)', border: '#2c4a6b', text: '#8FB6DE' },
+  '딜_혼합': { bg: 'rgba(139,38,38,0.12)', border: '#8b2626', text: '#D97B6E' },
+  '힐': { bg: 'rgba(45,90,39,0.15)', border: '#2d5a27', text: '#8FC77F' },
+  '버프_아군': { bg: 'rgba(184,147,90,0.2)', border: '#b8935a', text: '#D9BD8A' },
+  '버프_자신': { bg: 'rgba(184,147,90,0.15)', border: '#b8935a', text: '#D9BD8A' },
+  '디버프': { bg: 'rgba(90,45,90,0.15)', border: '#5a2d5a', text: '#B98FB9' },
+  '방어_아군': { bg: 'rgba(90,110,120,0.15)', border: '#5a6e78', text: '#A8BAC2' },
+  '방어_자신': { bg: 'rgba(90,110,120,0.12)', border: '#5a6e78', text: '#A8BAC2' },
+  '도발': { bg: 'rgba(184,134,11,0.18)', border: '#b8860b', text: '#E0C468' },
+  '지원_복합': { bg: 'rgba(107,76,107,0.15)', border: '#6b4c6b', text: '#C7A8C7' }
 };
 
 export const tacticRoleLabels = {

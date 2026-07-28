@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import TacticCard from '../components/TacticCard';
 import PageLayout from '../components/PageLayout';
 
@@ -10,25 +9,27 @@ export default function TacticsPage() {
 
 useEffect(() => {
     async function fetchTactics() {
-      // .order('name', { ascending: true })를 추가했습니다.
-      const { data } = await supabase
-        .from('tactics')
-        .select('*')
-        .order('name', { ascending: true }); 
-      
-      if (data) setTactics(data);
+      // 이 페이지만 따로 Supabase를 조회하지 않고, 다른 탭들과 같은
+      // /api/deck-assets 캐싱 API(1시간 revalidate)를 재사용한다.
+      const res = await fetch('/api/deck-assets');
+      const data = await res.json();
+      setTactics(data.tactics || []);
     }
     fetchTactics();
   }, []);
 
   return (
     <PageLayout>
-      <h1>전법 도감</h1>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
-        gap: '20px', 
-        marginTop: '20px' 
+      <header style={{ padding: '20px var(--pad-page) 14px', borderBottom: '0.5px solid var(--border)' }}>
+        <p className="header-eyebrow" style={{ margin: '0 0 4px' }}>SANGUOZHI · DECK OPS</p>
+        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 500, color: 'var(--text-primary)' }}>전법 도감</h1>
+      </header>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '20px',
+        padding: '20px var(--pad-page)',
       }}>
         {tactics.map(t => (
           <TacticCard 

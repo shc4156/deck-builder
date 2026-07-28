@@ -360,6 +360,7 @@ export default function MyDeckPage() {
                 activeSynergies={activeSynergies}
                 selectedGenerals={selectedGenerals}
                 selectedTactics={selectedTactics}
+                synergyMaster={synergies}
               />
             )}
 

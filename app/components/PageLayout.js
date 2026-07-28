@@ -15,50 +15,45 @@ export default function PageLayout({ children }) {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <header className="site-banner" style={{ position: 'relative' }}>
-        <div className="header-tools-row">
-          {/* 지휘부 도구 조건식 보완 */}
-{profile?.role === 'admin' || profile?.approval_code === '0000' ? (
-  <Link
-    href="/admin"
-    className="header-tools-left"
-    style={{
-      padding: '6px 16px',
-      border: '1px solid #d4af37',
-      borderRadius: '3px',
-      color: '#d4af37',
-      fontSize: '0.85rem',
-      fontWeight: 'bold',
-      letterSpacing: '1px',
-      textDecoration: 'none',
-      backgroundColor: 'rgba(212,175,55,0.08)',
-    }}
-  >
-    ⚔ 지휘부 도구
-  </Link>
-) : (
-  <span />
-)}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '8px 16px', borderBottom: '0.5px solid var(--border)',
+        background: 'var(--bg-page)', fontSize: 12,
+      }}>
+        {profile?.role === 'admin' || profile?.approval_code === '0000' ? (
+          <Link
+            href="/admin"
+            style={{
+              padding: '4px 10px',
+              border: '0.5px solid var(--border-strong)',
+              borderRadius: 6,
+              color: 'var(--accent)',
+              fontSize: 11,
+              fontWeight: 500,
+              textDecoration: 'none',
+            }}
+          >
+            ⚔ 지휘부 도구
+          </Link>
+        ) : (
+          <span />
+        )}
 
-          <div className="header-tools-right" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <AccountSwitcher />
-            <button onClick={handleLogout} style={{ /* 기존 스타일 그대로 */ }}>
-              로그아웃
-            </button>
-          </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <VersionBadge />
+          <AccountSwitcher />
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'none', border: 'none', color: 'var(--text-secondary)',
+              fontSize: 11, cursor: 'pointer', padding: 0,
+            }}
+          >
+            로그아웃
+          </button>
         </div>
-
-        <div className="site-banner-titlerow">
-          <span className="site-banner-ornament" />
-          <h1 className="site-banner-title">
-            편제방(編制房)
-            <VersionBadge />
-          </h1>
-          <span className="site-banner-ornament" />
-        </div>
-        <p className="site-banner-subtitle">삼국지 천하결전 덱 편성 · 14서버 꼬마맹 백정</p>
-      </header>
-      <main style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      </div>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}>
         {children}
       </main>
     </div>

@@ -48,33 +48,75 @@ export default function InstallBanner() {
     setShowIosBanner(false);
   };
 
-  const bannerStyle = {
-    position: 'fixed', bottom: 0, left: 0, right: 0,
-    background: '#1a1410', color: '#d4af37',
-    padding: '12px 16px', display: 'flex',
-    justifyContent: 'space-between', alignItems: 'center',
-    borderTop: '2px solid #d4af37', zIndex: 1000,
-    fontSize: 14,
+  if (!showBanner && !showIosBanner) return null;
+
+  // ---------------- 공통 카드 스타일(다크 지휘실 테마) ----------------
+  const wrapperStyle = {
+    position: 'fixed',
+    left: 0, right: 0,
+    bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+    display: 'flex', justifyContent: 'center',
+    zIndex: 1000, padding: '0 14px',
+    pointerEvents: 'none',
   };
 
+  const cardStyle = {
+    pointerEvents: 'auto',
+    width: '100%', maxWidth: 420,
+    display: 'flex', alignItems: 'center', gap: 12,
+    background: 'var(--bg-surface, #1C2027)',
+    border: '0.5px solid var(--border-strong, #3A3F4A)',
+    borderRadius: 14,
+    padding: '12px 14px',
+    boxShadow: '0 12px 30px rgba(0,0,0,0.45)',
+  };
+
+  const iconStyle = {
+    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+    border: '0.5px solid var(--border-strong, #3A3F4A)',
+  };
+
+  const textWrapStyle = { flex: 1, minWidth: 0 };
+
+  const titleStyle = {
+    margin: 0, fontSize: 13.5, fontWeight: 600,
+    color: 'var(--text-primary, #EDEDED)',
+  };
+
+  const subStyle = {
+    margin: '3px 0 0', fontSize: 11.5,
+    color: 'var(--text-secondary, #8A8F98)',
+    lineHeight: 1.4,
+  };
+
+  const btnRowStyle = { display: 'flex', gap: 6, flexShrink: 0 };
+
   const btnPrimary = {
-    background: '#8b1a1a', color: '#fff', border: 'none',
-    padding: '8px 16px', marginRight: 8, borderRadius: 4,
-    whiteSpace: 'nowrap',
+    background: 'var(--accent, #B8873A)', color: 'var(--accent-on, #14171D)',
+    border: 'none', padding: '8px 14px', borderRadius: 8,
+    fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer',
   };
 
   const btnGhost = {
-    background: 'transparent', color: '#d4af37', border: '1px solid #d4af37',
-    padding: '8px 16px', borderRadius: 4, whiteSpace: 'nowrap',
+    background: 'transparent', color: 'var(--text-secondary, #8A8F98)',
+    border: '0.5px solid var(--border-strong, #3A3F4A)',
+    padding: '8px 12px', borderRadius: 8,
+    fontSize: 12.5, whiteSpace: 'nowrap', cursor: 'pointer',
   };
 
   if (showBanner) {
     return (
-      <div style={bannerStyle}>
-        <span>천하결전 덱 빌더를 홈 화면에 추가하시겠어요?</span>
-        <div style={{ display: 'flex', flexShrink: 0 }}>
-          <button onClick={handleInstall} style={btnPrimary}>설치</button>
-          <button onClick={() => setShowBanner(false)} style={btnGhost}>닫기</button>
+      <div style={wrapperStyle}>
+        <div style={cardStyle}>
+          <img src="/icon-192.png" alt="천하결전 덱 빌더" style={iconStyle} />
+          <div style={textWrapStyle}>
+            <p style={titleStyle}>천하결전 덱 빌더 앱 설치</p>
+            <p style={subStyle}>홈 화면에 추가하고 앱처럼 빠르게 실행해보세요</p>
+          </div>
+          <div style={btnRowStyle}>
+            <button onClick={() => setShowBanner(false)} style={btnGhost}>닫기</button>
+            <button onClick={handleInstall} style={btnPrimary}>설치</button>
+          </div>
         </div>
       </div>
     );
@@ -82,10 +124,17 @@ export default function InstallBanner() {
 
   if (showIosBanner) {
     return (
-      <div style={{ ...bannerStyle, flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-          <span>홈 화면에 추가하려면: 하단 공유 버튼(⬆️) → "홈 화면에 추가"</span>
-          <button onClick={dismissIos} style={{ ...btnGhost, marginLeft: 12 }}>닫기</button>
+      <div style={wrapperStyle}>
+        <div style={{ ...cardStyle, alignItems: 'flex-start' }}>
+          <img src="/icon-192.png" alt="천하결전 덱 빌더" style={iconStyle} />
+          <div style={textWrapStyle}>
+            <p style={titleStyle}>천하결전 덱 빌더 앱 설치</p>
+            <p style={subStyle}>
+              하단 공유 버튼(<span style={{ color: 'var(--accent, #B8873A)', fontWeight: 700 }}>⬆️</span>)을 누른 뒤
+              &nbsp;<strong style={{ color: 'var(--text-primary, #EDEDED)' }}>"홈 화면에 추가"</strong>를 선택하세요
+            </p>
+          </div>
+          <button onClick={dismissIos} style={{ ...btnGhost, flexShrink: 0 }}>닫기</button>
         </div>
       </div>
     );

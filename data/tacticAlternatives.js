@@ -20,6 +20,11 @@
  * @param {number} [params.limit=3] 반환할 후보 개수
  * @returns {Array<string>} 궁합 순으로 정렬된 대체 전법 이름 배열
  */
+
+import { buildTacticFamilyIndex, getSubstituteScore } from './tacticCompatibility';
+
+const familyIndex = buildTacticFamilyIndex();
+
 export function findAlternativeTactics({
   generalName,
   recommendedTacticName,
@@ -57,8 +62,14 @@ export function findAlternativeTactics({
     const generalTagOverlap = tTags.filter(tag => generalSecondaryRoles.includes(tag));
     score += generalTagOverlap.length * 5;
 
+    // 발동 메커니즘 궁합(family) 가산점 — 100점 만점을 0.3 가중치로 반영
+    const compat = getSubstituteScore(targetTactic.id, t.id, familyIndex);
+    if (compat) {
+      score += compat.score * 0.3;
+    }
+
     return score;
-  };
+};
 
   // 2차: type(지휘/패시브/액티브/추격)이 원본과 같은 발동 슬롯인 후보를 우선 사용
   const typeMatched = roleMatched.filter(t => t.type === targetTactic.type);

@@ -4,7 +4,7 @@ export const factionColors = {
   '오': '#cc0000',
   '위': '#0000cc',
   '촉': '#008000',
-  '군': '#d4ac0d'
+  '군': '#8e44ad'
 };
 
 export const tacticColors = {
