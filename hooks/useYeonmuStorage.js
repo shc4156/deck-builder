@@ -30,8 +30,21 @@ function getCurrentWeekKey(now = new Date()) {
 const EMPTY_WAREHOUSE = {
   generals: [],       // 무장 10명 (name 배열)
   tactics: [],         // 전법 20개 (name 배열)
-  supportGeneral: null, // 지원 무장 1명
-  supportTactics: [],   // 지원 전법 2개
+  // 🆕 라운드픽(연무 드래프트) 3종 중 게임 내에서 실제로 선택한 것 — null이면 아직 미선택
+  //   'general'        : ① 무장 다시뽑기 — 10명 중 1명 교체
+  //   'tactic'          : ② 전법 다시뽑기 — 20개 중 2개 교체
+  //   'tactic_support'  : ③ 전법 지원 — 교체 없음, 보라 전법만 추가
+  draftMode: null,
+  // 🆕 ① 무장 다시뽑기 결과: 10명 중 어떤 장수를 어떤 장수로 바꿨는지
+  replacedGeneral: { from: null, to: null },
+  // 🆕 ② 전법 다시뽑기 결과: 20개 중 어떤 전법 2개를 어떤 전법으로 바꿨는지
+  replacedTactics: [
+    { from: null, to: null },
+    { from: null, to: null },
+  ],
+  supportGeneral: null, // 지원 무장 1명 (모든 모드 공통)
+  supportTactics: [],   // 지원 전법 2개 — 등급 무관 (모든 모드 공통)
+  supportPurpleTactic: null, // 🆕 ③ 전법 지원 전용 — 보라 등급 전법 1개 추가 슬롯
 };
 
 export function useYeonmuStorage() {

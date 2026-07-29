@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { tab: 'status', label: '현황', icon: IconUser },
   { tab: 'matches', label: '티어덱', icon: IconLayoutGrid },
   { tab: 'squads', label: '편성', icon: IconUsers },
-  { tab: 'tournament', label: '연무', icon: IconSwords, disabled: true },
+  { tab: 'tournament', label: '연무', icon: IconSwords },
   { tab: 'simulate', label: '시뮬', icon: IconChartBar, disabled: true },
 ];
 

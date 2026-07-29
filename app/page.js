@@ -27,7 +27,7 @@ const TAB_COMPONENTS = {
 
 // 배포 시 잠시 닫아두는 탭들 — 연무(tournament)/시뮬(vs)는 컴포넌트와 코드는
 // 그대로 두고, 여기서만 막아둡니다. 다시 열 때는 이 배열에서 지우기만 하면 됩니다.
-const DISABLED_TABS = ['vs', 'tournament'];
+const DISABLED_TABS = ['vs'];
 const isTabEnabled = (key) => Boolean(TAB_COMPONENTS[key]) && !DISABLED_TABS.includes(key);
 
 function HomeInner() {
