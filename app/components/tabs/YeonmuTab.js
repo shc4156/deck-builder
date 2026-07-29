@@ -816,7 +816,7 @@ function SelectableCard({ name, subLabel, isSelected, onClick, disabled }) {
 
 export default function YeonmuTab() {
   const { generals = [], tactics = [], selectedGenerals = [], selectedTactics = [], connections = [], formations = [], synergies = [] } = useDeckAssets();
-  const { warehouse, setWarehouse, isReady, resetWarehouse } = useYeonmuStorage();
+  const { warehouse, setWarehouse, isReady, resetWarehouse, isLoggedIn } = useYeonmuStorage();
   const [step, setStep] = useState('generals');
 
   // 🆕 텍스트 검색 및 진영 필터 state
@@ -1104,6 +1104,20 @@ export default function YeonmuTab() {
   const neededGenerals = YEONMU_SQUAD_COUNT * YEONMU_SQUAD_SIZE;
 
   if (!isReady) return null;
+
+  // 🆕 연무 창고가 계정(profiles) 저장 방식으로 바뀌면서 로그인이 필수가 됨 — 비로그인 시 안내만 표시
+  if (!isLoggedIn) {
+    return (
+      <div style={{ background: SCROLL.bg, minHeight: '100%', padding: '16px' }}>
+        <div style={{ maxWidth: '480px', margin: '40px auto', textAlign: 'center' }}>
+          <p style={{ fontSize: '13px', color: SCROLL.inkFaint, lineHeight: 1.6 }}>
+            연무대회 창고는 계정에 저장돼요.<br />
+            로그인 후 이용해주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: SCROLL.bg, minHeight: '100%', padding: '16px' }}>

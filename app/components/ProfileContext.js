@@ -21,7 +21,7 @@ export function ProfileProvider({ children }) {
       // 여기서 한 번에 가져와 profile 하나로 공유한다.
       const { data } = await supabase
         .from('profiles')
-        .select('nickname, role, selected_generals, selected_tactics, pinned_decks, squads')
+        .select('nickname, role, selected_generals, selected_tactics, pinned_decks, squads, yeonmu_warehouse')
         .eq('id', uid)
         .single();
 
