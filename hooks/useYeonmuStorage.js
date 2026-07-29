@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useProfile, useProfileActions } from '../components/ProfileContext';
+import { useProfile, useProfileActions } from '../app/components/ProfileContext';
 
 // 화요일 06:00을 주차 기준 시점으로 삼는다.
 // 지금 시각 기준으로 "가장 최근에 지난 화요일 06:00" 날짜(YYYY-MM-DD)를 weekKey로 만든다.
