@@ -3,6 +3,7 @@ import AuthGuard from './components/AuthGuard';
 import { ProfileProvider } from './components/ProfileContext';
 import InstallBanner from './components/InstallBanner';
 import 'pretendard/dist/web/static/pretendard.css';
+import { Analytics } from '@vercel/analytics/next';
 
 // 1. viewport 객체에 모바일 환경 옵션 보완
 export const viewport = {

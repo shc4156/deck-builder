@@ -2053,7 +2053,22 @@ export default function SquadsTab({ onNavigate }) {
                           padding: '14px', border: `0.5px solid ${SCROLL.border}`,
                           backgroundColor: SCROLL.bg, borderRadius: '10px'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
+                            {hero && (
+                              <div
+                                onClick={() => setDetailTarget({ type: 'general', name: hero.general_name })}
+                                title="클릭 시 장수 상세 보기"
+                                style={{ width: '44px', height: '44px', border: `1.5px solid ${SCROLL.gold}`, borderRadius: '8px', flexShrink: 0, overflow: 'hidden', cursor: 'pointer' }}
+                              >
+                                <img
+                                  src={hero.image_url || genObj?.image_url || '/images/generals/default.jpg'}
+                                  alt={hero.general_name}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(e) => { e.target.onerror = null; e.target.src = '/images/generals/default.jpg'; }}
+                                />
+                              </div>
+                            )}
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <select
                               value={hero?.general_name || ''}
                               disabled={generalLocked}
@@ -2114,14 +2129,61 @@ export default function SquadsTab({ onNavigate }) {
                                 {generalLocked ? '🔒 확정됨' : '🔓 확정'}
                               </button>
                             )}
+                            </div>
                           </div>
 
                           {hero && genObj && (
                             <div
                               onClick={() => setDetailTarget({ type: 'general', name: hero.general_name })}
-                              style={{ fontSize: '11px', color: SCROLL.gold, cursor: 'pointer', marginBottom: '10px', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                              style={{ fontSize: '11px', color: SCROLL.gold, cursor: 'pointer', marginBottom: '8px', textDecoration: 'underline', textUnderlineOffset: 2 }}
                             >
                               ℹ️ {hero.general_name} 상세보기 · {genObj.faction} · {genObj.position || '위치 미정'}
+                            </div>
+                          )}
+
+                          {/* 🆕 티어덱 카드와 동일하게 추천 위치 / 추천 속성 / 병종 / 장비 가이드 배지 표시 */}
+                          {hero && genObj && (
+                            <div style={{ marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {genObj.position && (
+                                <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>추천 위치</span>
+                                  <span style={{
+                                    backgroundColor: genObj.position === '전열' ? 'rgba(192,69,61,0.12)' : 'rgba(58,123,200,0.12)',
+                                    color: genObj.position === '전열' ? SCROLL.sealDark : SCROLL.blue,
+                                    border: `0.5px solid ${genObj.position === '전열' ? SCROLL.sealDark : SCROLL.blue}`,
+                                    padding: '1px 7px', borderRadius: '4px', fontWeight: 700
+                                  }}>
+                                    {genObj.position}
+                                  </span>
+                                </div>
+                              )}
+
+                              {genObj.main_stat && (
+                                <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>추천 속성</span>
+                                  <span style={{ backgroundColor: 'rgba(184,135,58,0.12)', color: SCROLL.gold, border: `0.5px solid ${SCROLL.gold}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 700 }}>
+                                    {genObj.main_stat}
+                                  </span>
+                                </div>
+                              )}
+
+                              {genObj.troop_type && (
+                                <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>병종</span>
+                                  <span style={{ backgroundColor: 'rgba(138,143,152,0.12)', color: SCROLL.inkSoft, border: `0.5px solid ${SCROLL.border}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 700 }}>
+                                    {genObj.troop_type}
+                                  </span>
+                                </div>
+                              )}
+
+                              {genObj.recommended_equip_stats && (
+                                <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>장비 가이드</span>
+                                  <span style={{ backgroundColor: SCROLL.greenBg, color: SCROLL.greenSoft, border: `0.5px solid ${SCROLL.green}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 700 }}>
+                                    {genObj.recommended_equip_stats}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
 
