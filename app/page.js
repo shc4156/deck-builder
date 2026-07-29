@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import PageLayout from './components/PageLayout';
 import BottomNav from './components/BottomNav';
+import { Analytics } from "@vercel/analytics/next"
 
 // 각 탭은 처음 열릴 때만 코드가 로드됩니다 (특히 squads가 커서 효과가 큽니다).
 // ssr: false로 두는 이유: 전부 클라이언트에서 Supabase를 호출하는 컴포넌트라
