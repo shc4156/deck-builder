@@ -75,6 +75,7 @@ export default function MatchesTab({ onNavigate }) {
   const userNickname = profile?.nickname || '백정';
 
   const [deckFilter, setDeckFilter] = useState('all'); // all | pinned
+  const [seasonFilter, setSeasonFilter] = useState('all'); // all | S1 | S2+3
   const [glossaryTerm, setGlossaryTerm] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [detailTarget, setDetailTarget] = useState(null); // { type: 'general'|'tactic', name } | null
@@ -114,6 +115,7 @@ export default function MatchesTab({ onNavigate }) {
       heroes.push({
         general_name: name,
         stat_focus: deck[`hero${i}_stat`] || '속성 미정',
+        troop: deck[`hero${i}_troop`] || null, // 시즌2+3부터 생긴 병종(장비 조합) 추천값 - 시즌1은 null
         main_tactics: mainTactics.length > 0 ? mainTactics : ['전법 정보 없음'],
         db_sub_tactics: dbSubTactics,
         added_tactics: mainTactics,
@@ -152,8 +154,9 @@ export default function MatchesTab({ onNavigate }) {
 
   const filteredDecks = tierDecks
     .filter(deck => {
-      if (deckFilter === 'pinned') return myPinnedDecks.some(id => String(id) === String(deck.id));
-      return true; // deck_type 컬럼이 없어 '전체' 외 별도 분류는 지원하지 않음
+      if (deckFilter === 'pinned' && !myPinnedDecks.some(id => String(id) === String(deck.id))) return false;
+      if (seasonFilter !== 'all' && (deck.season || 'S1') !== seasonFilter) return false;
+      return true;
     })
     .map(deck => ({ ...deck, matchInfo: calculateMatch(deck) }))
     .sort((a, b) => {
@@ -212,6 +215,32 @@ export default function MatchesTab({ onNavigate }) {
           })}
         </div>
 
+        {/* ---------------- 시즌 필터 ---------------- */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '8px var(--pad-page) 0' }}>
+          {[
+            { key: 'all', label: '전체 시즌' },
+            { key: 'S1', label: '시즌1' },
+            { key: 'S2+3', label: '시즌2+3' },
+          ].map(f => {
+            const active = seasonFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setSeasonFilter(f.key)}
+                style={{
+                  fontSize: 12, padding: '5px 10px', borderRadius: 4, cursor: 'pointer',
+                  background: active ? 'rgba(58,123,200,0.18)' : 'transparent',
+                  color: active ? '#5b9fe0' : 'var(--text-secondary)',
+                  border: active ? '0.5px solid rgba(58,123,200,0.4)' : '0.5px solid var(--border-strong)',
+                  fontWeight: active ? 500 : 400,
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* ---------------- 덱 리스트 ---------------- */}
         <div style={{ padding: '12px var(--pad-page) 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filteredDecks.map((deck, deckIdx) => {
@@ -261,11 +290,21 @@ export default function MatchesTab({ onNavigate }) {
                   </button>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{
-                      fontSize: 15.5, color: 'var(--text-primary)', overflow: 'hidden',
-                      textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
-                    }}>
-                      {deck.deck_name || '이름 없는 덱'}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontSize: 15.5, color: 'var(--text-primary)', overflow: 'hidden',
+                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {deck.deck_name || '이름 없는 덱'}
+                      </span>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                        background: deck.season === 'S2+3' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
+                        color: deck.season === 'S2+3' ? '#5b9fe0' : 'var(--text-muted)',
+                        border: `1px solid ${deck.season === 'S2+3' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
+                      }}>
+                        {deck.season || 'S1'}
+                      </span>
                     </span>
                     <p style={{
                       margin: '4px 0 0', fontSize: 12.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
@@ -353,7 +392,16 @@ export default function MatchesTab({ onNavigate }) {
                               >
                                 {gSetup.general_name}
                               </span>
-                              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                                {gSetup.troop && (
+                                  <span style={{
+                                    fontSize: 11, padding: '1px 6px', borderRadius: 3,
+                                    background: 'rgba(58,123,200,0.14)', color: '#5b9fe0',
+                                    border: '1px solid rgba(58,123,200,0.35)',
+                                  }}>
+                                    {gSetup.troop}
+                                  </span>
+                                )}
                                 {gSetup.stat_focus}
                               </span>
                             </div>

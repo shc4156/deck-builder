@@ -789,6 +789,7 @@ useEffect(() => {
       heroes.push({
         general_name: name,
         stat_focus: deck[`hero${i}_stat`] || '속성 미정',
+        troop: deck[`hero${i}_troop`] || null, // 시즌2+3부터 생긴 병종 추천값
         main_tactics: mainTactics,
         db_sub_tactics: dbSubTactics,
       });
