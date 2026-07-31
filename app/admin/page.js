@@ -98,6 +98,28 @@ export default function AdminPage() {
               맹원 닉네임으로 검색해 새 비밀번호를 직접 설정합니다.
             </p>
           </Link>
+
+          <Link href="/admin/upload" className="scroll-panel" style={{
+            padding: '28px 24px', textDecoration: 'none', display: 'block',
+            transition: 'all 0.2s ease'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🖼️</div>
+            <h3 className="classic-heading" style={{ fontSize: '1.2rem', margin: '0 0 8px 0' }}>장수 이미지 업로드</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--ink-text)', margin: 0, opacity: 0.75 }}>
+              장수 카드 이미지를 골라 자동 크롭 후 일괄 업로드합니다.
+            </p>
+          </Link>
+
+          <Link href="/admin/upload-tactic" className="scroll-panel" style={{
+            padding: '28px 24px', textDecoration: 'none', display: 'block',
+            transition: 'all 0.2s ease'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🎴</div>
+            <h3 className="classic-heading" style={{ fontSize: '1.2rem', margin: '0 0 8px 0' }}>전법 이미지 업로드</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--ink-text)', margin: 0, opacity: 0.75 }}>
+              전법 카드 이미지를 골라 일괄 업로드합니다.
+            </p>
+          </Link>
         </div>
       </div>
     </PageLayout>
