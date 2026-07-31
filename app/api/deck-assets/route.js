@@ -1,52 +1,30 @@
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../lib/supabaseAdmin';
 
-// 지휘부 도구 > 맹원 비밀번호 재설정 전용 API.
-// 클라이언트(admin/users/page.js)가 accessToken(요청자의 세션 토큰),
-// targetUserId(재설정 대상 유저 id), newPassword(새 비밀번호)를 보내면,
-// 1) accessToken으로 요청자가 누구인지 확인하고
-// 2) 그 요청자의 profiles.role이 'admin'인지 검사한 뒤
-// 3) 서비스 롤 키로 대상 유저의 비밀번호를 강제 변경한다.
-export async function POST(request) {
-  try {
-    const { targetUserId, newPassword, accessToken } = await request.json();
+// 정적/공용 데이터 전용 캐싱 API.
+// generals/tactics/synergies/tier_decks/general_connections/formations/general_roles는
+// 모든 유저가 똑같은 내용을 보고 자주 안 바뀌는 데이터라, 여기서 한 번에 모아 응답하고
+// Vercel 엣지가 아래 시간(초) 동안 이 응답을 캐싱해서 재사용한다.
+// 즉, 유저가 몇 명이든 Supabase에는 이 시간 간격으로 딱 1번만 실제 쿼리가 나간다.
+export const revalidate = 3600; // 1시간
 
-    if (!targetUserId || !newPassword || !accessToken) {
-      return Response.json({ error: '필요한 정보가 누락되었습니다.' }, { status: 400 });
-    }
-    if (newPassword.length < 6) {
-      return Response.json({ error: '비밀번호는 최소 6자 이상이어야 합니다.' }, { status: 400 });
-    }
+export async function GET() {
+  const [genRes, tactRes, synRes, tierRes, connRes, formRes, roleRes] = await Promise.all([
+    supabaseAdmin.from('generals').select('*').order('name'),
+    supabaseAdmin.from('tactics').select('*').order('name'),
+    supabaseAdmin.from('synergies').select('*'),
+    supabaseAdmin.from('tier_decks').select('*').order('id'),
+    supabaseAdmin.from('general_connections').select('*'),
+    supabaseAdmin.from('formations').select('*'),
+    supabaseAdmin.from('general_roles').select('*'),
+  ]);
 
-    // 1) 요청자 신원 확인
-    const { data: { user: requester }, error: authError } = await supabaseAdmin.auth.getUser(accessToken);
-    if (authError || !requester) {
-      return Response.json({ error: '인증되지 않은 요청입니다.' }, { status: 401 });
-    }
-
-    // 2) 요청자가 지휘부(admin)인지 확인
-    const { data: requesterProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', requester.id)
-      .single();
-
-    if (profileError || requesterProfile?.role !== 'admin') {
-      return Response.json({ error: '권한이 없습니다.' }, { status: 403 });
-    }
-
-    // 3) 대상 유저 비밀번호 강제 변경
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      targetUserId,
-      { password: newPassword }
-    );
-
-    if (updateError) {
-      return Response.json({ error: updateError.message }, { status: 400 });
-    }
-
-    return Response.json({ success: true });
-  } catch (err) {
-    console.error('reset-password API 오류:', err);
-    return Response.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
-  }
+  return Response.json({
+    generals: genRes.data || [],
+    tactics: tactRes.data || [],
+    synergies: synRes.data || [],
+    tierDecks: tierRes.data || [],
+    connections: connRes.data || [],
+    formations: formRes.data || [],
+    generalRoles: roleRes.data || [],
+  });
 }
