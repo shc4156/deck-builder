@@ -10,6 +10,15 @@ export default function GeneralCard({ general, isSelected, onSelect }) {
   const roleLabel = generalRoleLabels[general.primary_role] || general.primary_role;
   const secondaryRoles = general.secondary_roles || [];
 
+  // 시즌 뱃지: 시즌2+3은 신규 콘텐츠라는 걸 한눈에 구분할 수 있게 강조색을 다르게 준다.
+  const isNewSeason = general.season === 'S2+3';
+  const seasonBadge = {
+    label: general.season || 'S1',
+    bg: isNewSeason ? 'rgba(58,123,200,0.22)' : 'rgba(255,255,255,0.08)',
+    border: isNewSeason ? '#3A7BC8' : 'rgba(255,255,255,0.3)',
+    text: isNewSeason ? '#9fd0ff' : 'rgba(255,255,255,0.6)',
+  };
+
   // 선택 전후 스타일 정의
   const cardStyle = isSelected && general.image_url
     ? {
@@ -42,9 +51,22 @@ export default function GeneralCard({ general, isSelected, onSelect }) {
         flexDirection: 'column',
         justifyContent: 'flex-start',
         fontFamily: 'var(--font-body)',
+        position: 'relative',
         ...cardStyle
       }}
     >
+      {/* 시즌 뱃지: 우측 상단에 고정, 어느 카드 스타일이든 항상 보이도록 */}
+      <span style={{
+        position: 'absolute', top: '8px', right: '8px',
+        fontSize: '9px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '2px',
+        backgroundColor: seasonBadge.bg,
+        border: `1px solid ${seasonBadge.border}`,
+        color: seasonBadge.text,
+        letterSpacing: '0.02em',
+      }}>
+        {seasonBadge.label}
+      </span>
+
       {/* 진영은 좌측 컬러바로 이미 표시되므로, 상단엔 역할 배지만 노출해 정보 중복을 피함 */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
         <span style={{

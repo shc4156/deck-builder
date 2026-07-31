@@ -170,11 +170,21 @@ export default function StatusTab({ onNavigate }) {
                       }}
                     >
                       <span style={{ flex: 1, overflow: 'hidden' }}>
-                        <span style={{
-                          display: 'block', fontSize: 14, fontWeight: selected ? 500 : 400, color: 'var(--text-primary)',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {gen.name}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{
+                            fontSize: 14, fontWeight: selected ? 500 : 400, color: 'var(--text-primary)',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {gen.name}
+                          </span>
+                          <span style={{
+                            fontSize: 8.5, fontWeight: 700, padding: '1px 4px', borderRadius: 3, flexShrink: 0,
+                            background: gen.season === 'S2+3' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
+                            color: gen.season === 'S2+3' ? '#5b9fe0' : 'var(--text-muted)',
+                            border: `1px solid ${gen.season === 'S2+3' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
+                          }}>
+                            {gen.season || 'S1'}
+                          </span>
                         </span>
                         <span style={{
                           display: 'block', marginTop: 2, fontSize: 10.5, color: 'var(--text-muted)',
@@ -297,11 +307,21 @@ export default function StatusTab({ onNavigate }) {
                       }}
                     >
                       <span style={{ flex: 1, overflow: 'hidden' }}>
-                        <span style={{
-                          display: 'block', fontSize: 14, fontWeight: selected ? 500 : 400, color: 'var(--text-primary)',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {t.name}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{
+                            fontSize: 14, fontWeight: selected ? 500 : 400, color: 'var(--text-primary)',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {t.name}
+                          </span>
+                          <span style={{
+                            fontSize: 8.5, fontWeight: 700, padding: '1px 4px', borderRadius: 3, flexShrink: 0,
+                            background: t.season === 'S2+3' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
+                            color: t.season === 'S2+3' ? '#5b9fe0' : 'var(--text-muted)',
+                            border: `1px solid ${t.season === 'S2+3' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
+                          }}>
+                            {t.season || 'S1'}
+                          </span>
                         </span>
                         <span style={{
                           display: 'block', marginTop: 2, fontSize: 10.5, color: 'var(--text-muted)',
