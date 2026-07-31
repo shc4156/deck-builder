@@ -357,7 +357,7 @@ export default function SquadsTab({ onNavigate }) {
   } = useDeckAssets();
 
   const profile = useProfile();
-  const { updateProfile } = useProfileActions();
+  const { userId, updateProfile } = useProfileActions();   // userId 추가로 받아옴
   const userNickname = profile?.nickname || '백정';
 
   const [recommendedSquads, setRecommendedSquads] = useState([]);
@@ -474,11 +474,15 @@ export default function SquadsTab({ onNavigate }) {
     }
   };
 
-  useEffect(() => {
-    if (profile?.squads && profile.squads.length > 0) {
-      setRecommendedSquads(profile.squads);
-    }
-  }, [profile]);
+  const syncedSquadsUserIdRef = useRef(undefined);
+useEffect(() => {
+  if (!profile) return;
+  if (syncedSquadsUserIdRef.current === userId) return;
+  if (profile?.squads && profile.squads.length > 0) {
+    setRecommendedSquads(profile.squads);
+  }
+  syncedSquadsUserIdRef.current = userId;
+}, [profile, userId]);
 
   useEffect(() => {
     if (isLoading || !generals.length || !tactics.length || recommendedSquads.length === 0) return;

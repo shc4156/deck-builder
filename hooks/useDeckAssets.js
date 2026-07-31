@@ -1,6 +1,6 @@
 // hooks/useDeckAssets.js
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useProfile, useProfileActions } from '../app/components/ProfileContext';
 
 // page.js와 matches/page.js가 공통으로 쓰는 상태(보유 장수/전법, 로그인 유저, 티어덱 목록 등)와
@@ -90,15 +90,26 @@ export function useDeckAssets() {
 
   // 개인 데이터(보유 장수/전법, 핀 고정 티어덱): ProfileContext가 이미 세션당 1번
   // 로딩해둔 profile 값을 그대로 반영한다. profiles를 여기서 다시 조회하지 않는다.
+  //
+  // ⚠️ 주의: profile 객체는 (1) 탭/앱을 갔다왔을 때 Supabase가 자동으로 쏘는
+  // onAuthStateChange(토큰 갱신 등)나 (2) updateProfile()을 호출하는 아무 동작
+  // (티어덱 핀 고정, saveDeck 등)만으로도 새 참조로 재생성된다. 예전에는 이 effect가
+  // [profile]이 바뀔 때마다 무조건 재동기화해서, 편성 중(아직 저장 전)이던 선택 상태를
+  // DB에 마지막으로 저장된 값으로 되돌려버렸다 — 이게 "탭 전환 시 초기화"와
+  // "클릭하자마자 선택취소되는 것처럼 보이는" 문제의 원인이었다.
+  // 그래서 같은 userId에 대해서는 딱 한 번만(로그인/계정전환 시에만) 동기화한다.
+  const syncedUserIdRef = useRef(undefined);
   useEffect(() => {
     if (!profile) return;
+    if (syncedUserIdRef.current === userId) return; // 이미 이 유저 기준으로 동기화했으면 덮어쓰지 않음
 
     const loadedGens = profile.selected_generals ? profile.selected_generals.split(',') : [];
     const loadedTacts = profile.selected_tactics ? profile.selected_tactics.split(',') : [];
     setSelectedGenerals(loadedGens);
     setSelectedTactics(loadedTacts);
     setPinnedTierDeckIds(Array.isArray(profile.pinned_decks) ? profile.pinned_decks : []);
-  }, [profile]);
+    syncedUserIdRef.current = userId;
+  }, [profile, userId]);
 
   const toggleGeneral = (id) => {
     setSelectedGenerals(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
