@@ -241,10 +241,79 @@ export default function MatchesTab({ onNavigate }) {
           })}
         </div>
 
+        {/* ---------------- 통합 필요 장수/전법 (뽑기 참고용) ---------------- */}
+        {(() => {
+          // 지금 필터(전체/고정핀 · 시즌)에 걸린 덱들을 기준으로, 아직 없는 장수/전법이
+          // 몇 개 덱에서 쓰이는지 세어서 빈도순으로 보여준다. 뽑기 우선순위 판단용.
+          const genCount = {};
+          const tactCount = {};
+          filteredDecks.forEach(deck => {
+            const { deckGens = [], deckTactics = [], myGenNames = [], myTactNames = [] } = deck.matchInfo;
+            [...new Set(deckGens)].forEach(name => {
+              if (!myGenNames.includes(name)) genCount[name] = (genCount[name] || 0) + 1;
+            });
+            [...new Set(deckTactics)].forEach(name => {
+              if (name && name !== '전법 정보 없음' && !myTactNames.includes(name)) {
+                tactCount[name] = (tactCount[name] || 0) + 1;
+              }
+            });
+          });
+          const neededGens = Object.entries(genCount).sort((a, b) => b[1] - a[1]);
+          const neededTacts = Object.entries(tactCount).sort((a, b) => b[1] - a[1]);
+
+          if (neededGens.length === 0 && neededTacts.length === 0) return null;
+
+          return (
+            <div style={{
+              margin: '10px var(--pad-page) 0', background: 'var(--bg-surface)',
+              border: '0.5px solid var(--border)', borderRadius: 10, padding: '12px 14px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)' }}>
+                지금 필터 기준 통합 필요 목록 · 뽑기 참고용
+              </span>
+
+              {neededGens.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>장수 (많이 쓰이는 순)</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {neededGens.map(([name, count]) => (
+                      <span key={name} style={{
+                        fontSize: 12, padding: '3px 8px', borderRadius: 5,
+                        background: 'rgba(184,135,58,0.1)', color: 'var(--text-primary)',
+                        border: '0.5px solid rgba(184,135,58,0.25)',
+                      }}>
+                        {name} <span style={{ color: 'var(--accent)', fontWeight: 600 }}>· {count}덱</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {neededTacts.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>전법 (많이 쓰이는 순)</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {neededTacts.map(([name, count]) => (
+                      <span key={name} style={{
+                        fontSize: 12, padding: '3px 8px', borderRadius: 5,
+                        background: 'rgba(63,158,168,0.1)', color: 'var(--text-primary)',
+                        border: '0.5px solid rgba(63,158,168,0.25)',
+                      }}>
+                        {name} <span style={{ color: '#3F9EA8', fontWeight: 600 }}>· {count}덱</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ---------------- 덱 리스트 ---------------- */}
         <div style={{ padding: '12px var(--pad-page) 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filteredDecks.map((deck, deckIdx) => {
-            const { totalPercent, myGenNames, myTactNames, parsedSetup } = deck.matchInfo;
+            const { totalPercent, myGenNames, myTactNames, parsedSetup, deckGens, deckTactics } = deck.matchInfo;
             const tier = matchTier(totalPercent);
             const barColor = MATCH_COLOR[tier];
             const isPinned = myPinnedDecks.some(id => String(id) === String(deck.id));
@@ -262,6 +331,12 @@ export default function MatchesTab({ onNavigate }) {
                 </span>
               );
             });
+
+            // 이 덱을 완성하기 위해 아직 없는 장수/전법 - 펼친 상세 맨 위에 요약으로 보여준다.
+            const missingGenerals = [...new Set(deckGens)].filter(name => !myGenNames.includes(name));
+            const missingTactics = [...new Set(deckTactics)].filter(
+              name => name && name !== '전법 정보 없음' && !myTactNames.includes(name)
+            );
 
             return (
               <div
@@ -332,6 +407,37 @@ export default function MatchesTab({ onNavigate }) {
                 {/* 펼친 상태: 상세 */}
                 {isOpen && (
                   <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, borderTop: '0.5px solid var(--border)', marginTop: 10 }}>
+
+                    {/* 이 덱을 완성하려면 필요한 것 - 상세의 맨 위, 다른 정보보다 먼저 보이게 */}
+                    {(missingGenerals.length > 0 || missingTactics.length > 0) ? (
+                      <div style={{
+                        background: 'rgba(184,135,58,0.08)', border: '0.5px solid rgba(184,135,58,0.3)',
+                        borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6,
+                      }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent)' }}>
+                          이 덱을 완성하려면 필요한 것
+                        </span>
+                        {missingGenerals.length > 0 && (
+                          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                            장수: <span style={{ color: 'var(--text-primary)' }}>{missingGenerals.join(', ')}</span>
+                          </p>
+                        )}
+                        {missingTactics.length > 0 && (
+                          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                            전법: <span style={{ color: 'var(--text-primary)' }}>{missingTactics.join(', ')}</span>
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{
+                        background: 'rgba(63,158,168,0.08)', border: '0.5px solid rgba(63,158,168,0.3)',
+                        borderRadius: 8, padding: '10px 12px',
+                      }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#3F9EA8' }}>
+                          장수·전법 모두 보유 중이에요!
+                        </span>
+                      </div>
+                    )}
 
                     {deck.description && (
                       <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
