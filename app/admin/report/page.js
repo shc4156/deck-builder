@@ -95,6 +95,7 @@ export default function WeeklyReportPage() {
   const [weeklyStats, setWeeklyStats] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [contribThreshold, setContribThreshold] = useState(15000);
+  const [meritThreshold, setMeritThreshold] = useState(15000); // members 페이지와 동일: 공헌 또는 무훈 중 하나만 넘어도 액티브
   const [rangeDays, setRangeDays] = useState(7); // 리포트 집계 범위(일)
 
   useEffect(() => {
@@ -143,15 +144,20 @@ export default function WeeklyReportPage() {
       const isNew = !hasPastRecord;
       if (isNew) newCount += 1;
 
-      // 액티브 판정: 최근 rangeDays 누적 공헌 증가가 기준치 초과
+      // 액티브 판정: 최근 rangeDays 누적 공헌·무훈 증가 중 하나라도 기준치 초과
+      // (members 페이지와 동일하게, 공헌 위주/무훈 위주 어느 쪽으로 활동해도 인정)
       const windowStart = new Date(day);
       windowStart.setDate(windowStart.getDate() - (rangeDays - 1));
       let contribSum = 0;
+      let meritSum = 0;
       entries.forEach((e) => {
         const d = new Date(e.week_label);
-        if (d >= windowStart && d <= new Date(day)) contribSum += (e.contribDelta || 0);
+        if (d >= windowStart && d <= new Date(day)) {
+          contribSum += (e.contribDelta || 0);
+          meritSum += (e.meritDelta || 0);
+        }
       });
-      if (contribSum > contribThreshold) activeCount += 1;
+      if (contribSum > contribThreshold || meritSum > meritThreshold) activeCount += 1;
 
       if (!isNew) {
         if ((row.siege_count || 0) >= 1) siegeParticipants += 1;
@@ -320,6 +326,17 @@ export default function WeeklyReportPage() {
                 type="number"
                 value={contribThreshold}
                 onChange={(e) => setContribThreshold(Number(e.target.value))}
+                style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)', fontSize: '0.9rem' }}>
+                액티브 판정 기준 (무훈)
+              </label>
+              <input
+                type="number"
+                value={meritThreshold}
+                onChange={(e) => setMeritThreshold(Number(e.target.value))}
                 style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
               />
             </div>
