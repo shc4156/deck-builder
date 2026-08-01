@@ -168,7 +168,9 @@ export default function MemberManagementPage() {
   const [fileName, setFileName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
+  const [idsCopied, setIdsCopied] = useState(false);
   const [contribThreshold, setContribThreshold] = useState(15000);
+  const [meritThreshold, setMeritThreshold] = useState(15000); // 공헌과 별개로, 무훈만으로도 액티브 인정할 수 있는 기준치
   const [windowDays, setWindowDays] = useState(7); // 액티브 판정에 쓸 롤링 윈도우(일)
   const [weeklyStats, setWeeklyStats] = useState([]); // 전체 일자별 DB 데이터
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -229,6 +231,17 @@ export default function MemberManagementPage() {
     } else {
       setUploadMsg(`${records.length}명의 데이터를 ${dayLabel} 날짜로 저장했습니다.`);
       loadStats();
+    }
+  };
+
+  const copyInactiveIds = async (rows) => {
+    const text = rows.map((r) => r.char_id).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setIdsCopied(true);
+      setTimeout(() => setIdsCopied(false), 2000);
+    } catch (err) {
+      alert('복사에 실패했습니다: ' + err.message);
     }
   };
 
@@ -298,10 +311,14 @@ export default function MemberManagementPage() {
 
   // ── 액티브/비액티브: 인게임 리셋 카운터가 아니라
   //    "최근 N일 순수 증가량" 기준으로 판정 ──────────────
-  const activeCount = currentDayData.filter((r) => r.recentContribSum > contribThreshold).length;
-  const inactiveToday = currentDayData.filter((r) => r.recentContribSum <= contribThreshold);
+  // 공헌 위주로 노는 맹원, 전쟁/무훈 위주로 노는 맹원이 둘 다 있어서
+  // 공헌 기준치 "또는" 무훈 기준치 둘 중 하나만 넘어도 액티브로 인정한다.
+  const meetsActivityBar = (r) => r.recentContribSum > contribThreshold || r.recentMeritSum > meritThreshold;
 
-  // 2일 연속 "최근 윈도우 활동량"이 기준 이하인 사람 (컷 대상)
+  const activeCount = currentDayData.filter(meetsActivityBar).length;
+  const inactiveToday = currentDayData.filter((r) => !meetsActivityBar(r));
+
+  // 2일 연속 "최근 윈도우 활동량"이 (공헌·무훈 둘 다) 기준 이하인 사람 (컷 대상)
   const cutTargets = [];
   if (recentDays.length >= 2) {
     const [d1, d2] = recentDays; // d1=오늘, d2=어제
@@ -309,10 +326,14 @@ export default function MemberManagementPage() {
       const e1 = entries.find((e) => e.week_label === d1);
       const e2 = entries.find((e) => e.week_label === d2);
       if (!e1 || !e2) return;
-      const w1 = sumRecentWindow(entries, d1, windowDays).contribSum;
-      const w2 = sumRecentWindow(entries, d2, windowDays).contribSum;
-      if (w1 <= contribThreshold && w2 <= contribThreshold) {
-        cutTargets.push({ ...e1, isNew: !pastCharIds.has(charId), recentContribSum: w1 });
+      const w1c = sumRecentWindow(entries, d1, windowDays).contribSum;
+      const w1m = sumRecentWindow(entries, d1, windowDays).meritSum;
+      const w2c = sumRecentWindow(entries, d2, windowDays).contribSum;
+      const w2m = sumRecentWindow(entries, d2, windowDays).meritSum;
+      const day1Fails = w1c <= contribThreshold && w1m <= meritThreshold;
+      const day2Fails = w2c <= contribThreshold && w2m <= meritThreshold;
+      if (day1Fails && day2Fails) {
+        cutTargets.push({ ...e1, isNew: !pastCharIds.has(charId), recentContribSum: w1c, recentMeritSum: w1m });
       }
     });
   }
@@ -320,6 +341,7 @@ export default function MemberManagementPage() {
   // 필터: 오늘 무훈 증가가 0인 사람 (리셋 직후 카운터가 0인 것과 구분하기 위해 '오늘 증가분' 기준)
   const zeroMeritList = currentDayData.filter((r) => r.dailyMeritDelta === 0);
   const lowContribList = currentDayData.filter((r) => r.recentContribSum <= contribThreshold);
+  const lowMeritList = currentDayData.filter((r) => r.recentMeritSum <= meritThreshold);
   const lowSiegeList = [...currentDayData].sort((a, b) => a.cumulativeSiege - b.cumulativeSiege);
 
   // ── 차트용 데이터 ──────────────────────────────
@@ -344,6 +366,11 @@ export default function MemberManagementPage() {
     .sort((a, b) => a.recentContribSum - b.recentContribSum)
     .slice(0, 10)
     .map((r) => ({ name: r.member_name, [`최근${windowDays}일공헌`]: r.recentContribSum }));
+
+  const bottomMeritData = [...currentDayData]
+    .sort((a, b) => a.recentMeritSum - b.recentMeritSum)
+    .slice(0, 10)
+    .map((r) => ({ name: r.member_name, [`최근${windowDays}일무훈`]: r.recentMeritSum }));
 
   const bottomSiegeData = [...currentDayData]
     .sort((a, b) => a.cumulativeSiege - b.cumulativeSiege)
@@ -471,6 +498,15 @@ export default function MemberManagementPage() {
               />
             </div>
             <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>무훈 기준치 (최근 활동량 기준)</label>
+              <input
+                type="number"
+                value={meritThreshold}
+                onChange={(e) => setMeritThreshold(Number(e.target.value))}
+                style={{ padding: '8px 10px', border: '1px solid rgba(184,147,90,0.4)', width: '140px' }}
+              />
+            </div>
+            <div>
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', color: 'var(--seal-dark)' }}>활동량 집계 기간 (일)</label>
               <input
                 type="number"
@@ -492,7 +528,7 @@ export default function MemberManagementPage() {
           {latestDay && (
             <p style={{ fontSize: '0.9rem', color: 'var(--ink-text)' }}>
               현재 조회 기준 날짜: <strong>{latestDay}</strong> (전체 {currentDayData.length}명) ·
-              최근 <strong>{windowDays}일</strong> 순수 증가량 기준으로 액티브를 판정합니다 (인게임 주간 리셋과 무관).
+              최근 <strong>{windowDays}일</strong> 순수 증가량 기준으로, <strong>공헌 또는 무훈 둘 중 하나만</strong> 기준치를 넘어도 액티브로 판정합니다 (인게임 주간 리셋과 무관).
               {!prevDay && <span style={{ marginLeft: '10px', color: 'var(--seal-dark)' }}>* 이전 날짜 데이터가 없어 델타/누적은 오늘 값 그대로 시작됩니다.</span>}
             </p>
           )}
@@ -574,6 +610,18 @@ export default function MemberManagementPage() {
                   </ResponsiveContainer>
                 </div>
                 <div>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>최근 {windowDays}일 무훈 하위 10명</p>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={bottomMeritData} layout="vertical" margin={{ left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis type="category" dataKey="name" width={70} />
+                      <Tooltip />
+                      <Bar dataKey={`최근${windowDays}일무훈`} fill="var(--jade)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div>
                   <p style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '8px' }}>누적 공성횟수 하위 10명</p>
                   <ResponsiveContainer width="100%" height={260}>
                     <BarChart data={bottomSiegeData} layout="vertical" margin={{ left: 20 }}>
@@ -620,7 +668,7 @@ export default function MemberManagementPage() {
                         {r.job} · {r.position} · {r.group_name}
                       </div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--seal-dark)', fontWeight: 'bold', marginTop: '4px' }}>
-                        최근 {windowDays}일 공헌: {r.recentContribSum.toLocaleString()}
+                        최근 {windowDays}일 공헌: {r.recentContribSum.toLocaleString()} · 무훈: {r.recentMeritSum.toLocaleString()}
                       </div>
                     </div>
                   ))}
@@ -655,6 +703,21 @@ export default function MemberManagementPage() {
               </div>
             </ToggleSection>
 
+            <ToggleSection
+              title={`최근 ${windowDays}일 무훈 ${meritThreshold.toLocaleString()} 이하`}
+              count={lowMeritList.length}
+              accentColor="var(--jade)"
+            >
+              <div style={{ paddingTop: '14px' }}>
+                {lowMeritList.map((r) => (
+                  <div key={r.char_id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(184,147,90,0.15)', fontSize: '0.9rem' }}>
+                    <strong>{r.member_name}</strong> {r.isNew && <span style={{ color: 'var(--jade)', fontWeight: 'bold', marginLeft: '6px' }}>[신규]</span>}
+                    <span style={{ color: 'var(--seal-dark)', marginLeft: '6px' }}>{r.recentMeritSum.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </ToggleSection>
+
             <ToggleSection title="누적 공성횟수 낮은 순" count={Math.min(lowSiegeList.length, 15)} accentColor="var(--jade)">
               <div style={{ paddingTop: '14px' }}>
                 {lowSiegeList.slice(0, 15).map((r) => (
@@ -673,7 +736,19 @@ export default function MemberManagementPage() {
               accentColor="var(--seal-dark)"
               defaultOpen={true}
             >
-              <div style={{ overflowX: 'auto', paddingTop: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '14px' }}>
+                <button
+                  onClick={() => copyInactiveIds(inactiveToday)}
+                  style={{
+                    padding: '6px 14px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer',
+                    border: `1px solid ${idsCopied ? 'var(--jade)' : 'var(--seal-dark)'}`,
+                    color: idsCopied ? 'var(--jade)' : 'var(--seal-dark)', background: 'transparent',
+                  }}
+                >
+                  {idsCopied ? '복사됨!' : `아이디 전체 복사 (${inactiveToday.length}명)`}
+                </button>
+              </div>
+              <div style={{ overflowX: 'auto', paddingTop: '10px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.92rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--gold)' }}>
@@ -684,6 +759,7 @@ export default function MemberManagementPage() {
                       <th style={{ textAlign: 'right', padding: '8px' }}>누적 무훈</th>
                       <th style={{ textAlign: 'right', padding: '8px' }}>누적 공헌</th>
                       <th style={{ textAlign: 'right', padding: '8px' }}>최근 {windowDays}일 공헌</th>
+                      <th style={{ textAlign: 'right', padding: '8px' }}>최근 {windowDays}일 무훈</th>
                       <th style={{ textAlign: 'right', padding: '8px' }}>오늘 증가분</th>
                     </tr>
                   </thead>
@@ -701,6 +777,7 @@ export default function MemberManagementPage() {
                           <td style={{ padding: '8px', textAlign: 'right' }}>{r.cumulativeMerit.toLocaleString()}</td>
                           <td style={{ padding: '8px', textAlign: 'right' }}>{r.cumulativeContribution.toLocaleString()}</td>
                           <td style={{ padding: '8px', textAlign: 'right', color: 'var(--seal-dark)', fontWeight: 'bold' }}>{r.recentContribSum.toLocaleString()}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: 'var(--jade)', fontWeight: 'bold' }}>{r.recentMeritSum.toLocaleString()}</td>
                           <td style={{ padding: '8px', textAlign: 'right' }}>
                             {r.noPrevData ? '-' : r.dailyContribDelta.toLocaleString()}
                           </td>
