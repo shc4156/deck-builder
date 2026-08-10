@@ -120,6 +120,17 @@ export default function AdminPage() {
               전법 카드 이미지를 골라 일괄 업로드합니다.
             </p>
           </Link>
+
+          <Link href="/admin/jeongcheol" className="scroll-panel" style={{
+            padding: '28px 24px', textDecoration: 'none', display: 'block',
+            transition: 'all 0.2s ease'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>⚙️</div>
+            <h3 className="classic-heading" style={{ fontSize: '1.2rem', margin: '0 0 8px 0' }}>정철 계산기</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--ink-text)', margin: 0, opacity: 0.75 }}>
+              공성 루트별 정철 소요량과 시작 가능 시점을 계산합니다.
+            </p>
+          </Link>
         </div>
       </div>
     </PageLayout>

@@ -6,6 +6,14 @@ import { useCastleDirectory } from '../../hooks/useCastleDirectory';
 // 성 이름을 입력하면 저장된 좌표를 자동으로 보여주고,
 // 등록되지 않은 성이면 수동으로 좌표를 입력해 저장할 수 있는 입력 컴포넌트.
 //
+// "1453.420" 같이 인게임에서 그대로 복사한 좌표 문자열을 {x, y}로 분리.
+// 마침표/쉼표/공백 어떤 걸로 구분돼 있어도 숫자 두 개만 뽑아냄. 실패하면 null.
+function parseCoordPaste(text) {
+  const match = String(text).trim().match(/^(\d+)[.,\s]+(\d+)$/);
+  if (!match) return null;
+  return { x: match[1], y: match[2] };
+}
+
 // props:
 //  - name: 현재 입력된 성 이름
 //  - onNameChange(name)
@@ -76,10 +84,18 @@ export default function CastleLocationInput({ name, onNameChange, coord, onCoord
 
       {!coord && name.trim() && !loading && (
         <div style={{ display: 'flex', gap: '6px', marginTop: '6px', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--gold-soft)' }}>등록된 좌표 없음 →</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--gold-soft)' }}>등록된 좌표 없음 → (예: 1453.420 붙여넣기 가능)</span>
           <input
             value={manualX}
             onChange={(e) => setManualX(e.target.value)}
+            onPaste={(e) => {
+              const parsed = parseCoordPaste(e.clipboardData.getData('text'));
+              if (parsed) {
+                e.preventDefault();
+                setManualX(parsed.x);
+                setManualY(parsed.y);
+              }
+            }}
             placeholder="X"
             style={{ width: '60px', padding: '4px 6px', border: '1px solid rgba(184,147,90,0.4)' }}
           />
