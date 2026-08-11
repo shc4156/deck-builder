@@ -1,6 +1,7 @@
 // app/components/JeongcheolResultCard.js
 'use client';
 import { forwardRef } from 'react';
+import RouteMiniMap from './RouteMiniMap';
 
 function fmt(n) {
   if (n == null) return '-';
@@ -53,6 +54,10 @@ const JeongcheolResultCard = forwardRef(function JeongcheolResultCard(
       </div>
 
       <div style={{ height: '2px', background: 'linear-gradient(90deg, transparent, #8a6a2e 15%, #8a6a2e 85%, transparent)', marginBottom: '18px' }} />
+
+      <div style={{ marginBottom: '18px' }}>
+        <RouteMiniMap steps={steps} width={560} height={260} />
+      </div>
 
       <div style={{ fontSize: '15px', color: '#3a2a12' }}>
         {steps.map((s, i) => (
