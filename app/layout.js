@@ -4,6 +4,7 @@ import { ProfileProvider } from './components/ProfileContext';
 import InstallBanner from './components/InstallBanner';
 import 'pretendard/dist/web/static/pretendard.css';
 import { Analytics } from '@vercel/analytics/next';
+import Script from 'next/script';
 
 // 1. viewport 객체에 모바일 환경 옵션 보완
 export const viewport = {
@@ -32,6 +33,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ko">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8800882593980842"
+     crossorigin="anonymous"></script>
       <body>
         <AuthGuard>
           <ProfileProvider>{children}</ProfileProvider>

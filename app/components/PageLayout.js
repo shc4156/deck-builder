@@ -4,9 +4,20 @@ import { useProfile } from './ProfileContext';
 import AccountSwitcher from './AccountSwitcher';
 import VersionBadge from './VersionBadge';
 import { supabase } from '../lib/supabaseClient';
+import { useEffect } from 'react';
 
 export default function PageLayout({ children }) {
   const profile = useProfile();
+
+  useEffect(() => {
+  const ins = document.querySelector('.adsbygoogle');
+  if (ins && ins.getAttribute('data-adsbygoogle-status')) return; // 이미 처리된 경우 스킵
+  try {
+    (window.adsbygoogle = window.adsbygoogle || []).push({});
+  } catch (e) {
+    console.error(e);
+  }
+}, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -55,6 +66,16 @@ export default function PageLayout({ children }) {
       </div>
       <main style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}>
         {children}
+
+        {/* 여기에 광고 유닛 추가 */}
+  <ins
+    className="adsbygoogle"
+    style={{ display: 'block' }}
+    data-ad-client="ca-pub-8800882593980842"
+    data-ad-slot="9477210356"
+    data-ad-format="auto"
+    data-full-width-responsive="true"
+  />
       </main>
     </div>
   );
