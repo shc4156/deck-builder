@@ -5,6 +5,7 @@ import PageLayout from '../components/PageLayout';
 import { useDeckAssets } from '../../hooks/useDeckAssets';
 import { inferGeneralRole, inferTacticRole, findRecommendedGenerals } from '../../data/roleInference';
 import { GLOSSARY_CATEGORIES } from '../../data/glossary';
+import { TROOP_MASTERY } from '../../data/troopMastery';
 import { factionColors } from '../../styles/colors';
 import {
   IconChevronLeft,
@@ -24,6 +25,7 @@ const CATEGORIES = [
   { key: 'tactics', label: '전법도감' },
   { key: 'synergies', label: '인연도감' },
   { key: 'combos', label: '장수 콤보' },
+  { key: 'troops', label: '병종' },
   { key: 'glossary', label: '용어사전' },
 ];
 
@@ -112,6 +114,27 @@ export default function EncyclopediaPage() {
     const q = query.trim();
     return list.filter(c => c.leader_name?.includes(q) || c.follower_name?.includes(q));
   }, [connections, query]);
+
+  const filteredTroopMastery = useMemo(() => {
+  if (!query.trim()) return TROOP_MASTERY;
+  const q = query.trim();
+  const result = {};
+  Object.entries(TROOP_MASTERY).forEach(([coarseName, info]) => {
+    const subtypeEntries = Object.entries(info.subtypes).filter(([subName, sub]) =>
+      coarseName.includes(q) || subName.includes(q) ||
+      sub.classTrait?.name.includes(q) || sub.exclusiveMastery?.name.includes(q) ||
+      (sub.recommendedGenerals || []).some(n => n.includes(q))
+    );
+    const masteryMatches = (info.generalMastery || []).some(m => m.name.includes(q) || m.effect.includes(q));
+    if (subtypeEntries.length > 0 || coarseName.includes(q) || masteryMatches) {
+      result[coarseName] = {
+        ...info,
+        subtypes: Object.fromEntries(subtypeEntries.length > 0 ? subtypeEntries : Object.entries(info.subtypes)),
+      };
+    }
+  });
+  return result;
+}, [query]);
 
   const filteredGlossary = useMemo(() => {
     if (!query.trim()) return GLOSSARY_CATEGORIES;
@@ -294,6 +317,83 @@ export default function EncyclopediaPage() {
                 {filteredCombos.length === 0 && <EmptyNotice text="검색 결과가 없습니다." />}
               </div>
             )}
+
+            {/* ================= 병종 (진급/정통) ================= */}
+{category === 'troops' && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingBottom: 20 }}>
+    <p style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, margin: '0 0 4px' }}>
+      무장 레벨 35(병종 진급)/40(병종 정통)에서 해제됩니다. 병부 아이템으로 무장당 최대 2개까지 다른 병종을 추가 장착해 병종 자체를 바꿀 수도 있습니다.
+    </p>
+    {Object.entries(filteredTroopMastery).map(([coarseName, info]) => (
+      <div key={coarseName}>
+        <p style={{ fontSize: 11, color: 'var(--accent)', letterSpacing: '0.05em', margin: '0 0 8px', fontFamily: 'var(--font-mono)' }}>
+          {coarseName.toUpperCase()}
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {Object.entries(info.subtypes).map(([subName, sub]) => (
+            <div key={subName} style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 8, border: '0.5px solid var(--border)' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
+                {subName}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 6 }}>
+                <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                  병종특성 · {sub.classTrait.name}
+                </span>
+                <br />
+                {sub.classTrait.effect}
+              </div>
+              <div style={{
+                fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 8,
+                padding: sub.exclusiveMastery.isKeyMastery ? 8 : 0,
+                background: sub.exclusiveMastery.isKeyMastery ? 'rgba(184,135,58,0.10)' : 'transparent',
+                borderRadius: sub.exclusiveMastery.isKeyMastery ? 6 : 0,
+                border: sub.exclusiveMastery.isKeyMastery ? '0.5px solid var(--accent)' : 'none',
+              }}>
+                <span style={{ color: sub.exclusiveMastery.isKeyMastery ? 'var(--accent)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                  전용정통 · {sub.exclusiveMastery.name}{sub.exclusiveMastery.isKeyMastery ? ' ★' : ''}
+                </span>
+                <br />
+                {sub.exclusiveMastery.effect}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {(sub.recommendedGenerals || []).map(name => {
+                  const owned = ownedGeneralNames.has(name);
+                  return (
+                    <span key={name} style={{
+                      fontSize: 11, padding: '3px 8px', borderRadius: 999,
+                      background: owned ? 'rgba(184,135,58,0.15)' : 'var(--bg-page)',
+                      color: owned ? 'var(--accent)' : 'var(--text-secondary)',
+                      border: owned ? '0.5px solid var(--accent)' : '0.5px solid var(--border-strong)',
+                      fontWeight: owned ? 600 : 400,
+                    }}>
+                      {name}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {info.generalMastery?.length > 0 && (
+          <div style={{ marginTop: 8, padding: 10, background: 'var(--bg-surface)', borderRadius: 8 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
+              일반 정통 (계열 공통)
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {info.generalMastery.map(m => (
+                <div key={m.name} style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{m.name}</span> — {m.effect}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    ))}
+    {Object.keys(filteredTroopMastery).length === 0 && <EmptyNotice text="검색 결과가 없습니다." />}
+  </div>
+)}
 
             {/* ================= 용어사전 ================= */}
             {category === 'glossary' && (

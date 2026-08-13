@@ -1,12 +1,61 @@
 // data/synergies.js
-// 인게임 6대 공식 진형 마스터 데이터 정의
+// 인게임 공식 진형 마스터 데이터 정의
+// grid 구조: [전열좌, 전열중, 전열우, 후열좌, 후열중, 후열우] (0/1 — 해당 슬롯 사용 여부)
+// hitRates 구조: grid와 동일한 순서의 6칸 배열. 각 슬롯에 배치됐을 때 실제 피격 확률(%).
+//   슬롯이 비어있으면(grid=0) hitRates도 0. 같은 진형 내 사용 슬롯끼리 합은 100.
+//   출처: 인게임 진형 상세 화면의 "피격률" 표시값 (S1 시트 + S2 신규 진형 스크린샷 기준).
 export const FORMATIONS_MASTER = [
-  { name: "일자진", grid: [1, 1, 1, 0, 0, 0], effect: "전열이 받는 피해 8% 감소" },
-  { name: "기형진", grid: [0, 1, 0, 0, 1, 1], effect: "전열 피해 6% 감소, 후열 주는 피해 12% 증가" },
-  { name: "안형진", grid: [0, 1, 1, 1, 0, 0], effect: "전열 통솔 20 포인트 증가, 후열 주는 피해 15% 증가" },
-  { name: "방원진", grid: [1, 1, 0, 0, 0, 1], effect: "전열 받는 피해 5% 감소, 후열 연타 확률 40% 증가" },
-  { name: "추형진", grid: [0, 1, 0, 1, 0, 1], effect: "전열 주는 피해 16% 증가, 후열 받는 피해 5% 감소" },
-  { name: "어린진", grid: [1, 0, 0, 0, 1, 1], effect: "전열 피신 12% 증가, 후열 회심/묘책 확률 8% 증가" }
+  {
+    name: "일자진",
+    grid: [1, 1, 1, 0, 0, 0],
+    hitRates: [33, 34, 33, 0, 0, 0],
+    effect: "전열이 받는 피해 8% 감소"
+  },
+  {
+    name: "기형진",
+    grid: [0, 1, 0, 0, 1, 1],
+    hitRates: [0, 60, 0, 0, 20, 20],
+    effect: "전열 피해 6% 감소, 후열 주는 피해 12% 증가"
+  },
+  {
+    name: "안형진",
+    grid: [0, 1, 1, 1, 0, 0],
+    hitRates: [0, 40, 40, 20, 0, 0],
+    effect: "전열 통솔 20 포인트 증가, 후열 주는 피해 15% 증가"
+  },
+  {
+    name: "방원진",
+    grid: [1, 1, 0, 0, 0, 1],
+    hitRates: [40, 40, 0, 0, 0, 20],
+    effect: "전열 받는 피해 5% 감소, 후열 연타 확률 40% 증가"
+  },
+  {
+    name: "추형진",
+    grid: [0, 1, 0, 1, 0, 1],
+    hitRates: [0, 60, 0, 20, 0, 20],
+    effect: "전열 주는 피해 16% 증가, 후열 받는 피해 5% 감소"
+  },
+  {
+    name: "어린진",
+    grid: [1, 0, 0, 0, 1, 1],
+    hitRates: [60, 0, 0, 0, 20, 20],
+    effect: "전열 피신 12% 증가, 후열 회심/묘책 확률 8% 증가"
+  },
+  // S2 시즌 신규 진형
+  // 구행진: 인게임 화면상 전열 캐릭터가 우측에, 후열 2명이 좌/중에 배치되어 표시됨.
+  // grid가 기존 6개 진형과 겹치지 않아 variant 코드 없이 구분 가능.
+  {
+    name: "구행진",
+    grid: [0, 0, 1, 1, 1, 0],
+    hitRates: [0, 0, 60, 20, 20, 0],
+    effect: "전열이 받는 피해 8% 감소, 후열의 연타율 25% 증가"
+  },
+  {
+    name: "언월진",
+    grid: [1, 0, 1, 0, 1, 0],
+    hitRates: [40, 0, 40, 0, 20, 0],
+    effect: "전열이 주는 피해 14% 증가, 후열이 받는 피해 5% 감소"
+  }
 ];
 
 export const SYNERGY_MASTER = [
@@ -68,9 +117,9 @@ export const getActiveSynergiesFromSetup = (deckSetup) => {
   });
 };
 
-// 진형 grid 좌표를 FORMATIONS_MASTER와 대조해 이름/효과를 찾아주는 함수
+// 진형 grid 좌표를 FORMATIONS_MASTER와 대조해 이름/효과/피격률을 찾아주는 함수
 export const matchFormationInfo = (rawGrid) => {
-  if (!rawGrid) return { name: "진형 조율 중", effect: "지정된 진형 속성이 없습니다." };
+  if (!rawGrid) return { name: "진형 조율 중", effect: "지정된 진형 속성이 없습니다.", hitRates: null };
 
   let parsedGrid = [];
   try {
@@ -86,7 +135,7 @@ export const matchFormationInfo = (rawGrid) => {
   }
 
   if (!Array.isArray(parsedGrid) || parsedGrid.length !== 6) {
-    return { name: "수기 연동 오류", effect: "6칸 진형 좌표 데이터 규격이 맞지 않습니다." };
+    return { name: "수기 연동 오류", effect: "6칸 진형 좌표 데이터 규격이 맞지 않습니다.", hitRates: null };
   }
 
   const matched = FORMATIONS_MASTER.find(f =>
@@ -94,8 +143,8 @@ export const matchFormationInfo = (rawGrid) => {
   );
 
   if (matched) {
-    return { name: matched.name, effect: matched.effect };
+    return { name: matched.name, effect: matched.effect, hitRates: matched.hitRates || null };
   }
 
-  return { name: `맞춤진형 (${parsedGrid.join('')})`, effect: "유저 지정 수기 정렬 효과 연동" };
+  return { name: `맞춤진형 (${parsedGrid.join('')})`, effect: "유저 지정 수기 정렬 효과 연동", hitRates: null };
 };

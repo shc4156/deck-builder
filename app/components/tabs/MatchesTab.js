@@ -457,6 +457,12 @@ export default function MatchesTab({ onNavigate }) {
                         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
                           진형 효과: {formationInfo.effect}
                         </p>
+                        {formationInfo.hitRates && (
+                          <p style={{ fontSize: 12, color: 'var(--text-faded)', margin: 0, lineHeight: 1.5 }}>
+                            피격률(좌/중/우) — 전열 {formationInfo.hitRates.slice(0, 3).filter(v => v > 0).join('/') || '-'}%,
+                            {' '}후열 {formationInfo.hitRates.slice(3, 6).filter(v => v > 0).join('/') || '-'}%
+                          </p>
+                        )}
                       </div>
                       <FormationGridVisual
                         gridData={buildFormationGridData(formationGrid, parsedSetup)}

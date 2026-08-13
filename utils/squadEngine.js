@@ -1,5 +1,6 @@
 import { getFormationForTrio, connectionScoreOf } from '../app/lib/squadOptimizer';
 import { buildTacticFamilyIndex, getSubstituteScore } from '../data/tacticCompatibility';
+import { ROLE_TROOP_AFFINITY } from '../data/troopMastery';
 
 // 모듈 로드 시 한 번만 생성 — 편성 루프 돌 때마다 다시 만들지 않도록
 const familyIndex = buildTacticFamilyIndex();
@@ -254,6 +255,43 @@ function findBestSubstituteTactic(originalTacticObj, generalObj, candidatePool) 
 
   scored.sort((a, b) => b.score - a.score);
   return scored[0] || null;
+}
+
+/**
+ * 장수 1명에게 병부 전환을 추천할지 계산합니다.
+ * explicitTroop(티어덱 curated 값)이 있으면 그걸 그대로 쓰고,
+ * 없을 때만 역할 적합도 + 부대 내 병종 통일 시너지를 합쳐 자동 추천합니다.
+ */
+export function suggestTroopConversion({ generalObj, squadEffectiveTroops = [], explicitTroop = null }) {
+  if (explicitTroop) {
+    return { troop: explicitTroop, source: 'tierdeck', reason: '티어덱 권장값' };
+  }
+  if (!generalObj) return null;
+
+  const nativeTroop = generalObj.troop_type;
+  const affinity = ROLE_TROOP_AFFINITY[generalObj.primary_role] || {};
+  const candidates = ['방패병', '창병', '기병', '궁병'];
+
+  const scoreOf = (troop) => {
+    let score = affinity[troop] || 0;
+    const sameCount = squadEffectiveTroops.filter(t => t === troop).length;
+    score += sameCount === 2 ? 30 : sameCount === 1 ? 10 : 0;
+    if (troop === nativeTroop) score += 8; // 병부 소모 없이 유지 가능 → 현상유지 소폭 가산
+    return score;
+  };
+
+  let best = nativeTroop;
+  let bestScore = scoreOf(nativeTroop);
+  candidates.forEach(troop => {
+    const s = scoreOf(troop);
+    if (s > bestScore) { bestScore = s; best = troop; }
+  });
+
+  if (best === nativeTroop) return null;
+  const gain = bestScore - scoreOf(nativeTroop);
+  if (gain < 15) return null;
+
+  return { troop: best, source: 'heuristic', reason: gain >= 30 ? '역할+조합 시너지 강함' : '역할 적합도 우위' };
 }
 
 /**

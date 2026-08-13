@@ -4,7 +4,7 @@ import html2canvas from 'html2canvas';
 import FormationGridVisual from '../FormationGridVisual';
 import DetailPopup from '../DetailPopup';
 import { useDeckAssets } from '../../../hooks/useDeckAssets';
-import { evaluateTacticFit, evaluateGeneralFit, buildGeneralRoleIndex } from '../../../utils/squadEngine';
+import { evaluateTacticFit, evaluateGeneralFit, buildGeneralRoleIndex, suggestTroopConversion } from '../../../utils/squadEngine';
 import { useProfile, useProfileActions } from '../ProfileContext';
 
 /* ============================================================
@@ -279,6 +279,51 @@ const getPositionEffectBonus = (effectText, gen) => {
   return bonus;
 };
 
+// 진형의 전열/후열 슬롯 중 사용 중인 슬롯들의 평균 피격률을 구한다.
+// hitRates가 없는(구 DB row 등) 경우 null을 반환해 가점 로직을 건너뛰게 한다.
+const getAvgHitRateByPosition = (formation, gridArr) => {
+  let hitRatesArr = null;
+  try {
+    if (Array.isArray(formation.hitRates)) {
+      hitRatesArr = formation.hitRates;
+    } else if (Array.isArray(formation.hit_rates)) {
+      hitRatesArr = formation.hit_rates;
+    } else if (typeof formation.hit_rates === 'string') {
+      hitRatesArr = formation.hit_rates.includes('[')
+        ? JSON.parse(formation.hit_rates)
+        : formation.hit_rates.split(',').map(Number);
+    }
+  } catch {
+    hitRatesArr = null;
+  }
+  if (!hitRatesArr || hitRatesArr.length !== 6) return { front: null, back: null };
+
+  const frontVals = [0, 1, 2].filter(i => Number(gridArr[i]) === 1).map(i => Number(hitRatesArr[i]));
+  const backVals = [3, 4, 5].filter(i => Number(gridArr[i]) === 1).map(i => Number(hitRatesArr[i]));
+
+  const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+  return { front: avg(frontVals), back: avg(backVals) };
+};
+
+// 탱커/방어형은 많이 맞을수록(고피격 슬롯) 이득 — 반격/피격 스택형 정통·전법이 몰려있음.
+// 딜러·힐러·버퍼·디버퍼는 적게 맞을수록(저피격 슬롯) 이득 — 생존해야 역할을 계속 수행 가능.
+// 역할 그룹은 화면 상단에 이미 있는 ROLE_GROUP_MAP(탱/딜/힐/버프/디버프)을 그대로 재사용한다.
+const getHitRatePreferenceBonus = (avgHitRate, gen) => {
+  if (avgHitRate === null || avgHitRate === undefined || !gen) return 0;
+
+  const roleGroup = ROLE_GROUP_MAP[gen.preferred_tactic_type] || '';
+  // 평균 피격률(대략 0~60%대) 기준, 40% 이상이면 "고피격 슬롯"으로 간주
+  const isHighAggroSlot = avgHitRate >= 40;
+
+  if (roleGroup === '탱') {
+    return isHighAggroSlot ? 12 : -6;
+  }
+  if (roleGroup === '딜' || roleGroup === '힐' || roleGroup === '버프' || roleGroup === '디버프') {
+    return isHighAggroSlot ? -8 : 8;
+  }
+  return 0;
+};
+
 const evaluateFormationFit = (squadSetup, formation, generalsList) => {
   if (!squadSetup || !formation || !generalsList) return 50;
 
@@ -299,6 +344,7 @@ const evaluateFormationFit = (squadSetup, formation, generalsList) => {
 
   const frontCount = gridArr.slice(0, 3).filter(v => Number(v) === 1).length;
   const backCount = gridArr.slice(3, 6).filter(v => Number(v) === 1).length;
+  const { front: avgFrontHitRate, back: avgBackHitRate } = getAvgHitRateByPosition(formation, gridArr);
 
   squadSetup.forEach((hero) => {
     const gen = generalsList.find(g => g.name === hero.general_name);
@@ -309,10 +355,12 @@ const evaluateFormationFit = (squadSetup, formation, generalsList) => {
     if (pos === '전열' && frontCount >= 1) {
       score += 10;
       score += getPositionEffectBonus(formation.front_effect, gen);
+      score += getHitRatePreferenceBonus(avgFrontHitRate, gen);
     }
     if (pos === '후열' && backCount >= 1) {
       score += 10;
       score += getPositionEffectBonus(formation.back_effect, gen);
+      score += getHitRatePreferenceBonus(avgBackHitRate, gen);
     }
   });
 
@@ -548,23 +596,22 @@ useEffect(() => {
   };
   const FACTION_BONUS_RULE = { 2: '모든 속성 +5%', 3: '모든 속성 +10%' };
 
-  const getActiveTroopFactionBonuses = (heroNames, generalsList) => {
-    if (!heroNames || !generalsList) return [];
+  const getActiveTroopFactionBonuses = (heroSetups, generalsList) => {
+    if (!heroSetups || !generalsList) return [];
 
-    const genObjs = heroNames
-      .map(name => generalsList.find(g => g.name === name?.trim()))
+    const genObjs = heroSetups
+      .map(h => {
+        const g = generalsList.find(g => g.name === h.general_name?.trim());
+        if (!g) return null;
+        // 티어덱이 병부 전환을 전제로 짜여 있으면 권장 병종을 실질 병종으로 간주
+        return { ...g, effectiveTroop: h.recommended_troop || g.troop_type };
+      })
       .filter(Boolean);
 
     const bonuses = [];
 
     const troopCounts = {};
-    genObjs.forEach(g => { if (g.troop_type) troopCounts[g.troop_type] = (troopCounts[g.troop_type] || 0) + 1; });
-    Object.entries(troopCounts).forEach(([troop, count]) => {
-      if (count >= 2 && TROOP_BONUS_RULES[troop]) {
-        const tier = count >= 3 ? 3 : 2;
-        bonuses.push({ type: 'troop', label: `${troop} ${tier}명`, effect: TROOP_BONUS_RULES[troop][tier] });
-      }
-    });
+    genObjs.forEach(g => { if (g.effectiveTroop) troopCounts[g.effectiveTroop] = (troopCounts[g.effectiveTroop] || 0) + 1; });
 
     const factionCounts = {};
     genObjs.forEach(g => { if (g.faction) factionCounts[g.faction] = (factionCounts[g.faction] || 0) + 1; });
@@ -882,6 +929,7 @@ useEffect(() => {
       if (parsedHeroes.length === 0) continue;
 
       const currentSquadGenNames = [];
+      const currentSquadEffectiveTroops = [];
       const squadNum = squads.length + 1;
 
       const squadSetup = parsedHeroes.map((hero, heroIndex) => {
@@ -924,6 +972,21 @@ useEffect(() => {
           usedGenerals.add(assignedGen.name?.trim());
           currentSquadGenNames.push(assignedGen.name?.trim());
         }
+
+        if (assignedGen) {
+          usedGenerals.add(assignedGen.name?.trim());
+          currentSquadGenNames.push(assignedGen.name?.trim());
+        }
+
+        const troopSuggestion = assignedGen
+          ? suggestTroopConversion({
+              generalObj: assignedGen,
+              squadEffectiveTroops: currentSquadEffectiveTroops,
+              explicitTroop: hero.troop || null
+            })
+          : null;
+        const effectiveTroop = troopSuggestion?.troop || assignedGen?.troop_type || null;
+        if (effectiveTroop) currentSquadEffectiveTroops.push(effectiveTroop);
 
         const processedTactics = hero.main_tactics.map((tName, tacticIndex) => {
           const lockedTacticName = lockedTactics[`${squadNum}-${heroIndex}-${tacticIndex}`];
@@ -999,6 +1062,10 @@ useEffect(() => {
           image_url: assignedGen?.image_url || '/images/generals/default.jpg',
           isSubstituted: !isOwned,
           stat_focus: hero.stat_focus,
+          recommended_troop: troopSuggestion?.troop || null,
+          troop_mismatch: Boolean(troopSuggestion && assignedGen?.troop_type && troopSuggestion.troop !== assignedGen.troop_type),
+          troop_source: troopSuggestion?.source || null,
+          troop_reason: troopSuggestion?.reason || null,
           tactics: processedTactics
         };
       });
@@ -1407,7 +1474,7 @@ useEffect(() => {
               const activeSynergies = getActiveSynergies(currentHeroNames);
               const activeConnections = getActiveConnections(currentHeroNames);
               const formationInfo = squad.formationInfo || getMatchedFormation(squad.formationGrid?.join(','), formations);
-              const activeTroopFactionBonuses = getActiveTroopFactionBonuses(currentHeroNames, generals);
+              const activeTroopFactionBonuses = getActiveTroopFactionBonuses(squad.setup, generals);
 
               const squadFitScore = evaluateFormationFit(squad.setup, formationInfo, generals);
               const squadFitTier = getTierBadge(squadFitScore);
@@ -1747,6 +1814,25 @@ useEffect(() => {
                                   </div>
                                 )}
 
+                                {hero.recommended_troop && (
+                                  <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                    <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>
+                                      권장 병종({hero.troop_source === 'tierdeck' ? '덱 데이터' : 'AI 추천'})
+                                    </span>
+                                    <span style={{
+                                      backgroundColor: hero.troop_mismatch ? 'rgba(192,69,61,0.12)' : 'rgba(58,123,200,0.12)',
+                                      color: hero.troop_mismatch ? SCROLL.sealDark : SCROLL.blue,
+                                      border: `0.5px solid ${hero.troop_mismatch ? SCROLL.sealDark : SCROLL.blue}`,
+                                      padding: '1px 7px', borderRadius: '4px', fontWeight: 700
+                                    }}>
+                                      {hero.recommended_troop}{hero.troop_mismatch ? ' (병부 전환 필요)' : ' (일치)'}
+                                    </span>
+                                    {hero.troop_reason && (
+                                      <span style={{ fontSize: '10px', color: SCROLL.inkFaint }}>· {hero.troop_reason}</span>
+                                    )}
+                                  </div>
+                                )}
+
                                 {currentGen?.recommended_equip_stats && (
                                   <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>장비 가이드</span>
@@ -1865,11 +1951,34 @@ useEffect(() => {
               const isCollapsed = Boolean(collapsedSquads[squadNum]);
 
               const manualHeroNames = manual.setup.filter(Boolean).map(h => h.general_name);
+              const manualGenObjs = manual.setup
+                .filter(Boolean)
+                .map(h => generals.find(g => g.name === h.general_name))
+                .filter(Boolean);
+
+              const manualHeroSetups = manual.setup.filter(Boolean).map(h => {
+                const genObj = generals.find(g => g.name === h.general_name);
+                const othersNativeTroops = manualGenObjs
+                  .filter(g => g.name !== genObj?.name)
+                  .map(g => g.troop_type)
+                  .filter(Boolean);
+                const suggestion = genObj
+                  ? suggestTroopConversion({ generalObj: genObj, squadEffectiveTroops: othersNativeTroops, explicitTroop: null })
+                  : null;
+                return {
+                  general_name: h.general_name,
+                  recommended_troop: suggestion?.troop || null,
+                  troop_mismatch: Boolean(suggestion && genObj?.troop_type && suggestion.troop !== genObj.troop_type),
+                  troop_source: suggestion?.source || null,
+                  troop_reason: suggestion?.reason || null,
+                };
+              });
+
               const validHeroesForFit = manual.setup.filter(Boolean);
               const manualFormationInfo = manual.formationInfo || getMatchedFormation((manual.formationGrid || []).join(','), formations);
               const manualActiveSynergies = getActiveSynergies(manualHeroNames);
               const manualActiveConnections = getActiveConnections(manualHeroNames);
-              const manualActiveTroopFactionBonuses = getActiveTroopFactionBonuses(manualHeroNames, generals);
+              const manualActiveTroopFactionBonuses = getActiveTroopFactionBonuses(manualHeroSetups, generals);
               const manualFitScore = evaluateFormationFit(validHeroesForFit, manualFormationInfo, generals);
               const manualFitTier = getTierBadge(manualFitScore);
 
@@ -2043,6 +2152,10 @@ useEffect(() => {
                     {[0, 1, 2].map((heroIndex) => {
                       const hero = manual.setup[heroIndex];
                       const genObj = hero ? generals.find(g => g.name === hero.general_name) : null;
+                      const heroTroopSuggestion = hero
+                        ? manualHeroSetups.find(hs => hs.general_name === hero.general_name)
+                        : null;
+
                       const generalCandidates = getManualGeneralCandidates(slotIndex, heroIndex);
                       const generalLocked = isGeneralLocked(squadNum, heroIndex);
 
@@ -2178,6 +2291,25 @@ useEffect(() => {
                                   <span style={{ backgroundColor: 'rgba(138,143,152,0.12)', color: SCROLL.inkSoft, border: `0.5px solid ${SCROLL.border}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 700 }}>
                                     {genObj.troop_type}
                                   </span>
+                                </div>
+                              )}
+
+                              {heroTroopSuggestion?.recommended_troop && (
+                                <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>
+                                    권장 병종(AI 추천)
+                                  </span>
+                                  <span style={{
+                                    backgroundColor: heroTroopSuggestion.troop_mismatch ? 'rgba(192,69,61,0.12)' : 'rgba(58,123,200,0.12)',
+                                    color: heroTroopSuggestion.troop_mismatch ? SCROLL.sealDark : SCROLL.blue,
+                                    border: `0.5px solid ${heroTroopSuggestion.troop_mismatch ? SCROLL.sealDark : SCROLL.blue}`,
+                                    padding: '1px 7px', borderRadius: '4px', fontWeight: 700
+                                  }}>
+                                    {heroTroopSuggestion.recommended_troop}{heroTroopSuggestion.troop_mismatch ? ' (병부 전환 필요)' : ' (일치)'}
+                                  </span>
+                                  {heroTroopSuggestion.troop_reason && (
+                                    <span style={{ fontSize: '10px', color: SCROLL.inkFaint }}>· {heroTroopSuggestion.troop_reason}</span>
+                                  )}
                                 </div>
                               )}
 
