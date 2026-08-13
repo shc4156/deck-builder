@@ -5,6 +5,7 @@ import AccountSwitcher from './AccountSwitcher';
 import VersionBadge from './VersionBadge';
 import { supabase } from '../lib/supabaseClient';
 import { useEffect } from 'react';
+import { Analytics } from "@vercel/analytics/next"
 
 export default function PageLayout({ children }) {
   const profile = useProfile();
