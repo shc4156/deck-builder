@@ -75,7 +75,8 @@ export default function MatchesTab({ onNavigate }) {
   const userNickname = profile?.nickname || '백정';
 
   const [deckFilter, setDeckFilter] = useState('all'); // all | pinned
-  const [seasonFilter, setSeasonFilter] = useState('all'); // all | S1 | S2+3
+  const [seasonFilter, setSeasonFilter] = useState('all'); // all | S1 | S2
+  const [categoryFilter, setCategoryFilter] = useState('all'); // all | 개척덱 | 시즌덱
   const [glossaryTerm, setGlossaryTerm] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [detailTarget, setDetailTarget] = useState(null); // { type: 'general'|'tactic', name } | null
@@ -115,7 +116,7 @@ export default function MatchesTab({ onNavigate }) {
       heroes.push({
         general_name: name,
         stat_focus: deck[`hero${i}_stat`] || '속성 미정',
-        troop: deck[`hero${i}_troop`] || null, // 시즌2+3부터 생긴 병종(장비 조합) 추천값 - 시즌1은 null
+        troop: deck[`hero${i}_troop`] || null, // 시즌2부터 생긴 병종(장비 조합) 추천값 - 시즌1은 null
         main_tactics: mainTactics.length > 0 ? mainTactics : ['전법 정보 없음'],
         db_sub_tactics: dbSubTactics,
         added_tactics: mainTactics,
@@ -156,6 +157,7 @@ export default function MatchesTab({ onNavigate }) {
     .filter(deck => {
       if (deckFilter === 'pinned' && !myPinnedDecks.some(id => String(id) === String(deck.id))) return false;
       if (seasonFilter !== 'all' && (deck.season || 'S1') !== seasonFilter) return false;
+      if (categoryFilter !== 'all' && deck.deck_category !== categoryFilter) return false;
       return true;
     })
     .map(deck => ({ ...deck, matchInfo: calculateMatch(deck) }))
@@ -220,7 +222,7 @@ export default function MatchesTab({ onNavigate }) {
           {[
             { key: 'all', label: '전체 시즌' },
             { key: 'S1', label: '시즌1' },
-            { key: 'S2+3', label: '시즌2+3' },
+            { key: 'S2', label: '시즌2' },
           ].map(f => {
             const active = seasonFilter === f.key;
             return (
@@ -232,6 +234,32 @@ export default function MatchesTab({ onNavigate }) {
                   background: active ? 'rgba(58,123,200,0.18)' : 'transparent',
                   color: active ? '#5b9fe0' : 'var(--text-secondary)',
                   border: active ? '0.5px solid rgba(58,123,200,0.4)' : '0.5px solid var(--border-strong)',
+                  fontWeight: active ? 500 : 400,
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ---------------- 용도 필터 (개척덱: 초반 세력 확장용 / 시즌덱: 공성 등 시즌 콘텐츠용) ---------------- */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '8px var(--pad-page) 0' }}>
+          {[
+            { key: 'all', label: '전체 용도' },
+            { key: '개척덱', label: '개척덱' },
+            { key: '시즌덱', label: '시즌덱' },
+          ].map(f => {
+            const active = categoryFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setCategoryFilter(f.key)}
+                style={{
+                  fontSize: 12, padding: '5px 10px', borderRadius: 4, cursor: 'pointer',
+                  background: active ? 'rgba(184,135,58,0.18)' : 'transparent',
+                  color: active ? 'var(--gold, #b8873a)' : 'var(--text-secondary)',
+                  border: active ? '0.5px solid rgba(184,135,58,0.4)' : '0.5px solid var(--border-strong)',
                   fontWeight: active ? 500 : 400,
                 }}
               >
@@ -374,12 +402,21 @@ export default function MatchesTab({ onNavigate }) {
                       </span>
                       <span style={{
                         fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
-                        background: deck.season === 'S2+3' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
-                        color: deck.season === 'S2+3' ? '#5b9fe0' : 'var(--text-muted)',
-                        border: `1px solid ${deck.season === 'S2+3' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
+                        background: deck.season === 'S2' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
+                        color: deck.season === 'S2' ? '#5b9fe0' : 'var(--text-muted)',
+                        border: `1px solid ${deck.season === 'S2' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
                       }}>
                         {deck.season || 'S1'}
                       </span>
+                      {deck.deck_category && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                          background: 'rgba(184,135,58,0.18)', color: 'var(--gold, #b8873a)',
+                          border: '1px solid rgba(184,135,58,0.4)',
+                        }}>
+                          {deck.deck_category}
+                        </span>
+                      )}
                     </span>
                     <p style={{
                       margin: '4px 0 0', fontSize: 12.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',

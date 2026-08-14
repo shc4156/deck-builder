@@ -50,6 +50,11 @@ export default function UploadTacticPage() {
     setIsUploading(true);
     setResults([]);
 
+    // 서버 API가 요청자 신원(admin 여부)을 확인해야 하므로, 현재 로그인 세션의
+    // accessToken을 한 번만 꺼내둔다.
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+
     for (const file of imageFiles) {
       const fileName = getNameFromFile(file);
       const matched = tactics.find(t => t.name === fileName);
@@ -63,24 +68,20 @@ export default function UploadTacticPage() {
         const blob = await cropImage(file);
         const storageFileName = `tactic_${Date.now()}_${matched.id}.png`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('generals')
-          .upload(storageFileName, blob, { cacheControl: '3600', upsert: true });
+        // storage 업로드 + DB update를 서버측 API(서비스 롤 키, RLS 우회)에 위임한다.
+        const formData = new FormData();
+        formData.append('file', blob, storageFileName);
+        formData.append('tacticId', matched.id);
+        formData.append('accessToken', accessToken);
 
-        if (uploadError) {
-          setResults(prev => [...prev, { file: file.name, status: 'error', message: '업로드 실패: ' + uploadError.message }]);
-          continue;
-        }
+        const res = await fetch('/api/admin/upload-tactic-image', {
+          method: 'POST',
+          body: formData,
+        });
+        const result = await res.json();
 
-        const { data: publicData } = supabase.storage.from('generals').getPublicUrl(storageFileName);
-
-        const { error: updateError } = await supabase
-          .from('tactics')
-          .update({ image_url: publicData.publicUrl })
-          .eq('id', matched.id);
-
-        if (updateError) {
-          setResults(prev => [...prev, { file: file.name, status: 'error', message: 'DB 업데이트 실패: ' + updateError.message }]);
+        if (!result.success) {
+          setResults(prev => [...prev, { file: file.name, status: 'error', message: result.error || '업로드 실패' }]);
           continue;
         }
 

@@ -1,6 +1,6 @@
 import { getFormationForTrio, connectionScoreOf } from '../app/lib/squadOptimizer';
 import { buildTacticFamilyIndex, getSubstituteScore } from '../data/tacticCompatibility';
-import { ROLE_TROOP_AFFINITY } from '../data/troopMastery';
+import { ROLE_TROOP_AFFINITY, suggestTroopSubtype } from '../data/troopMastery';
 
 // 모듈 로드 시 한 번만 생성 — 편성 루프 돌 때마다 다시 만들지 않도록
 const familyIndex = buildTacticFamilyIndex();
@@ -261,10 +261,28 @@ function findBestSubstituteTactic(originalTacticObj, generalObj, candidatePool) 
  * 장수 1명에게 병부 전환을 추천할지 계산합니다.
  * explicitTroop(티어덱 curated 값)이 있으면 그걸 그대로 쓰고,
  * 없을 때만 역할 적합도 + 부대 내 병종 통일 시너지를 합쳐 자동 추천합니다.
+ * coarse 병종(방패병/창병/기병/궁병)이 정해지면, 그 안의 세부 병종(예: 중방패병/검방패병)도
+ * troopMastery의 suggestTroopSubtype으로 이어서 판단해 결과에 함께 담습니다.
+ *
+ * 주의: coarse 병종 자체는 이미 최적(=병부로 갈아탈 필요 없음)이어서 전환 추천이
+ * 없는 경우에도, "지금 병종을 어느 세부(예: 중방패병 vs 검방패병)로 정통 찍을지"는
+ * 여전히 유효한 질문이라 subtype 계산은 별도로 계속 진행합니다. 이 경우 troop은
+ * nativeTroop 그대로, troop_mismatch는 false로 나가고 subtype만 채워집니다.
+ * (explicitTroop 쪽은 티어덱이 coarse 값만 갖고 있어 subtype은 항상 heuristic으로 판단)
  */
 export function suggestTroopConversion({ generalObj, squadEffectiveTroops = [], explicitTroop = null }) {
   if (explicitTroop) {
-    return { troop: explicitTroop, source: 'tierdeck', reason: '티어덱 권장값' };
+    const subtypeResult = suggestTroopSubtype(explicitTroop, generalObj);
+    return {
+      troop: explicitTroop,
+      source: 'tierdeck',
+      reason: '티어덱 권장값',
+      subtype: subtypeResult?.subtype || null,
+      subtypeSource: subtypeResult?.source || null,
+      subtypeReason: subtypeResult?.reason || null,
+      subtypeConfidence: subtypeResult?.confidence || null,
+      subtypeCandidates: subtypeResult?.candidates || null
+    };
   }
   if (!generalObj) return null;
 
@@ -287,11 +305,26 @@ export function suggestTroopConversion({ generalObj, squadEffectiveTroops = [], 
     if (s > bestScore) { bestScore = s; best = troop; }
   });
 
-  if (best === nativeTroop) return null;
   const gain = bestScore - scoreOf(nativeTroop);
-  if (gain < 15) return null;
+  const troopChanged = best !== nativeTroop && gain >= 15;
 
-  return { troop: best, source: 'heuristic', reason: gain >= 30 ? '역할+조합 시너지 강함' : '역할 적합도 우위' };
+  // coarse 병종 전환이 없어도(이미 nativeTroop이 최적) subtype은 nativeTroop 기준으로 계속 판단.
+  // 전환이 있으면 전환될 병종(best) 기준으로 판단.
+  const effectiveTroop = troopChanged ? best : nativeTroop;
+  const subtypeResult = suggestTroopSubtype(effectiveTroop, generalObj);
+
+  if (!troopChanged && !subtypeResult) return null;
+
+  return {
+    troop: effectiveTroop,
+    source: troopChanged ? 'heuristic' : 'native',
+    reason: troopChanged ? (gain >= 30 ? '역할+조합 시너지 강함' : '역할 적합도 우위') : '현재 병종 유지, 세부 진급만 추천',
+    subtype: subtypeResult?.subtype || null,
+    subtypeSource: subtypeResult?.source || null,
+    subtypeReason: subtypeResult?.reason || null,
+    subtypeConfidence: subtypeResult?.confidence || null,
+    subtypeCandidates: subtypeResult?.candidates || null
+  };
 }
 
 /**

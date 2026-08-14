@@ -5,7 +5,7 @@ import { useDeckAssets } from '../../../hooks/useDeckAssets';
 import { useProfile } from '../ProfileContext';
 import FeedbackForm from '../FeedbackForm';
 import Link from 'next/link';
-import { IconBook2, IconMessage2, IconX } from '@tabler/icons-react';
+import { IconBook2, IconMessage2, IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 
 // 통합 도감 탭(Dictionary)은 새 구조에서 /encyclopedia 로 옮겨졌으므로 이 페이지에서 제거했습니다.
 // recommendFullSquads, matchFormationInfo는 이 파일에서 쓰이지 않아 정리했습니다.
@@ -41,6 +41,8 @@ export default function StatusTab({ onNavigate }) {
   const [generalFactionFilter, setGeneralFactionFilter] = useState('전체');
   const [tacticGradeFilter, setTacticGradeFilter] = useState('전체');
   const [tacticTypeFilter, setTacticTypeFilter] = useState('전체');
+  const [generalsCollapsed, setGeneralsCollapsed] = useState(false);
+  const [tacticsCollapsed, setTacticsCollapsed] = useState(false);
 
   // 닉네임은 여기서 profiles를 따로 조회하지 않고 ProfileContext(세션당 1회 로딩)에서 읽는다.
   const profile = useProfile();
@@ -102,9 +104,21 @@ export default function StatusTab({ onNavigate }) {
             {/* ---------------- 보유 장수 ---------------- */}
             <section style={{ marginTop: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>
-                  보유 장수 <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({selectedGenerals.length}명)</span>
-                </h2>
+                <button
+                  onClick={() => setGeneralsCollapsed(prev => !prev)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
+                    padding: 0, cursor: 'pointer', color: 'var(--text-primary)',
+                  }}
+                >
+                  <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>
+                    보유 장수 <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({selectedGenerals.length}명)</span>
+                  </h2>
+                  {generalsCollapsed
+                    ? <IconChevronDown size={16} stroke={1.75} style={{ color: 'var(--text-muted)' }} />
+                    : <IconChevronUp size={16} stroke={1.75} style={{ color: 'var(--text-muted)' }} />}
+                </button>
+                {!generalsCollapsed && (
                 <button
                   onClick={() => {
                     const idsInView = filteredGenerals.map(g => g.id);
@@ -122,7 +136,10 @@ export default function StatusTab({ onNavigate }) {
                 >
                   {filteredGenerals.every(g => selectedGenerals.includes(g.id)) ? '전체 해제' : '전체 선택'}
                 </button>
+                )}
               </div>
+              {!generalsCollapsed && (
+              <>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                 {['전체', '위', '촉', '오', '군'].map(faction => {
                   const active = generalFactionFilter === faction;
@@ -179,9 +196,9 @@ export default function StatusTab({ onNavigate }) {
                           </span>
                           <span style={{
                             fontSize: 8.5, fontWeight: 700, padding: '1px 4px', borderRadius: 3, flexShrink: 0,
-                            background: gen.season === 'S2+3' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
-                            color: gen.season === 'S2+3' ? '#5b9fe0' : 'var(--text-muted)',
-                            border: `1px solid ${gen.season === 'S2+3' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
+                            background: gen.season === 'S2' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
+                            color: gen.season === 'S2' ? '#5b9fe0' : 'var(--text-muted)',
+                            border: `1px solid ${gen.season === 'S2' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
                           }}>
                             {gen.season || 'S1'}
                           </span>
@@ -207,15 +224,29 @@ export default function StatusTab({ onNavigate }) {
                   );
                 })}
               </div>
+              </>
+              )}
             </section>
 
 
             {/* ---------------- 보유 전법 ---------------- */}
             <section style={{ marginTop: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>
-                  보유 전법 <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({selectedTactics.length}개)</span>
-                </h2>
+                <button
+                  onClick={() => setTacticsCollapsed(prev => !prev)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
+                    padding: 0, cursor: 'pointer', color: 'var(--text-primary)',
+                  }}
+                >
+                  <h2 style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>
+                    보유 전법 <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({selectedTactics.length}개)</span>
+                  </h2>
+                  {tacticsCollapsed
+                    ? <IconChevronDown size={16} stroke={1.75} style={{ color: 'var(--text-muted)' }} />
+                    : <IconChevronUp size={16} stroke={1.75} style={{ color: 'var(--text-muted)' }} />}
+                </button>
+                {!tacticsCollapsed && (
                 <button
                   onClick={() => {
                     const idsInView = filteredTactics.map(t => t.id);
@@ -233,7 +264,10 @@ export default function StatusTab({ onNavigate }) {
                 >
                   {filteredTactics.every(t => selectedTactics.includes(t.id)) ? '전체 해제' : '전체 선택'}
                 </button>
+                )}
               </div>
+              {!tacticsCollapsed && (
+              <>
               <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                 {['전체', '황금', '보라'].map(grade => {
                   const active = tacticGradeFilter === grade;
@@ -316,9 +350,9 @@ export default function StatusTab({ onNavigate }) {
                           </span>
                           <span style={{
                             fontSize: 8.5, fontWeight: 700, padding: '1px 4px', borderRadius: 3, flexShrink: 0,
-                            background: t.season === 'S2+3' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
-                            color: t.season === 'S2+3' ? '#5b9fe0' : 'var(--text-muted)',
-                            border: `1px solid ${t.season === 'S2+3' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
+                            background: t.season === 'S2' ? 'rgba(58,123,200,0.18)' : 'rgba(255,255,255,0.08)',
+                            color: t.season === 'S2' ? '#5b9fe0' : 'var(--text-muted)',
+                            border: `1px solid ${t.season === 'S2' ? 'rgba(58,123,200,0.4)' : 'var(--border-strong)'}`,
                           }}>
                             {t.season || 'S1'}
                           </span>
@@ -351,6 +385,8 @@ export default function StatusTab({ onNavigate }) {
                   );
                 })}
               </div>
+              </>
+              )}
             </section>
 
             {/* ---------------- 저장 ---------------- */}
@@ -370,6 +406,32 @@ export default function StatusTab({ onNavigate }) {
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                 {userNickname} 님 계정으로 저장됩니다
               </span>
+            </div>
+
+            {/* ---------------- 플로팅 저장 버튼: 하단 네비게이션 바로 위에 항상 고정, 목록 끝까지 안 내려가도 바로 저장 가능 ---------------- */}
+            <div style={{
+              position: 'fixed',
+              bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+              left: 0, right: 0,
+              maxWidth: 480, margin: '0 auto',
+              padding: '0 var(--pad-page)',
+              zIndex: 90,
+              pointerEvents: 'none',
+            }}>
+              <button
+                onClick={saveDeck}
+                disabled={isSaving}
+                style={{
+                  width: '100%', padding: '12px 0', borderRadius: 8,
+                  background: 'var(--accent)', color: 'var(--accent-on)',
+                  border: 'none', fontWeight: 500, fontSize: 14,
+                  cursor: isSaving ? 'default' : 'pointer', opacity: isSaving ? 0.9 : 1,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+                  pointerEvents: 'auto',
+                }}
+              >
+                {isSaving ? `기록 중... (${countdown})` : '보유 현황 저장'}
+              </button>
             </div>
           </div>
         )}

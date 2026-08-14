@@ -123,6 +123,88 @@ export function getSubtypeOptions(coarseTroopType) {
   return Object.entries(info.subtypes).map(([subtypeName, data]) => ({ subtypeName, ...data }));
 }
 
+/**
+ * coarse 병종(방패병/창병/기병/궁병)이 정해진 뒤, 그 안의 세부 병종(예: 중방패병/검방패병)
+ * 중 이 장수에게 더 맞는 쪽을 항상 하나 골라서 돌려준다(subtype은 더 이상 null을 반환하지 않음).
+ * 대신 confidence 필드로 근거 강도를 함께 돌려줘서, UI가 "확정 추천"과 "참고용 추천"을 구분해 표현할 수 있게 한다.
+ * 1순위: 각 subtype의 recommendedGenerals 명단에 이 장수 이름이 있으면 그쪽을 그대로 채택 — confidence: 'high'.
+ * 2순위: SUBTYPE_ROLE_AFFINITY로 이 장수 역할(primary_role)과 더 잘 맞는 쪽을 점수로 비교.
+ *   - 둘 다 점수 0(평가 근거 자체가 없음) — 방향성을 만들어내지 않고 그대로 둘 다 제시 — confidence: 'none'
+ *   - 점수가 동점(양쪽 다 근거는 있지만 같음) — 한쪽으로 고르지 않고 후보로만 제시 — confidence: 'low'
+ *   - 점수 차이가 10점 미만(근접) — 우위 쪽을 제시하나 근소 우위·참고용임을 명시 — confidence: 'low'
+ *   - 점수 차이가 10점 이상 — 확실한 우위 — confidence: 'high'
+ */
+export function suggestTroopSubtype(coarseTroopType, generalObj) {
+  const options = getSubtypeOptions(coarseTroopType);
+  if (options.length !== 2 || !generalObj) return null;
+
+  const generalName = generalObj.name?.trim();
+  const namedMatches = options.filter(opt =>
+    generalName && Array.isArray(opt.recommendedGenerals) && opt.recommendedGenerals.includes(generalName)
+  );
+
+  // 정확히 한쪽 명단에만 있으면 그걸로 확정 (최고 신뢰도)
+  if (namedMatches.length === 1) {
+    return {
+      subtype: namedMatches[0].subtypeName,
+      source: 'named',
+      reason: '해당 병종 진급 추천 무장 명단에 포함',
+      confidence: 'high'
+    };
+  }
+
+  // 역할 폴백 (표 자체가 없으면 판단 근거가 없어 양쪽 그대로 제시)
+  const affinityTable = SUBTYPE_ROLE_AFFINITY[coarseTroopType?.trim()];
+  if (!affinityTable) {
+    return {
+      subtype: null,
+      source: 'none',
+      reason: '판단 근거 없음 — 둘 다 무방',
+      confidence: 'none',
+      candidates: options.map(o => o.subtypeName)
+    };
+  }
+
+  const role = generalObj.primary_role;
+  const scored = options.map(opt => ({
+    subtype: opt.subtypeName,
+    score: (affinityTable[opt.subtypeName] && affinityTable[opt.subtypeName][role]) || 0
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+  const [first, second] = scored;
+
+  // 진짜 근거 없음(양쪽 다 0점) — 방향성 자체를 만들어내지 않고 둘 다 그대로 제시
+  if (first.score === 0 && second.score === 0) {
+    return {
+      subtype: null,
+      source: 'none',
+      reason: '둘 다 무방(판단 근거 없음)',
+      confidence: 'none',
+      candidates: [first.subtype, second.subtype]
+    };
+  }
+
+  // 점수가 동점이면(양쪽 다 근거는 있지만 같음) 한쪽으로 고르지 않고 후보로 제시
+  if (first.score === second.score) {
+    return {
+      subtype: null,
+      source: 'role_tied',
+      reason: `${first.subtype} / ${second.subtype} 동점 — 상황에 맞게 선택`,
+      confidence: 'low',
+      candidates: [first.subtype, second.subtype]
+    };
+  }
+
+  const gap = first.score - second.score;
+  return {
+    subtype: first.subtype,
+    source: 'role',
+    reason: gap >= 10 ? '역할 적합도 기준 추천' : `${first.subtype} 근소 우위(참고용)`,
+    confidence: gap >= 10 ? 'high' : 'low'
+  };
+}
+
 // 장수 역할(primary_role) → 어느 coarse 병종의 진급/정통이 그 역할과 잘 맞는지 가중치
 // (각 병종의 classTrait/exclusiveMastery 성격을 참고해 수기로 매핑)
 export const ROLE_TROOP_AFFINITY = {
@@ -134,4 +216,49 @@ export const ROLE_TROOP_AFFINITY = {
   지휘_보조: { 궁병: 16, 방패병: 10 },
   디버퍼: { 창병: 18, 궁병: 14 },
   버퍼: { 궁병: 14, 방패병: 12 },
+};
+
+// coarse 병종이 정해진 뒤, 그 안의 두 세부 진급(subtype) 중 어느 쪽이 이 장수 역할과
+// 더 맞는지 판단하는 가중치. recommendedGenerals 명단에 없는 장수에 한해 폴백으로 쓰는
+// 용도라, subtype의 classTrait/exclusiveMastery 성격(생존형인지 딜/제어형인지)을 보고
+// 큰 틀에서만 구분함 — 정교한 시뮬레이션이 아니라 "둘 중 뭐가 더 자연스러운가" 수준.
+//
+// 각 coarse 병종의 "주 역할"(방패병=탱커, 창병=딜/디버퍼, 기병=딜, 궁병=딜책략/힐)이
+// 아닌 조합(예: 방패병인데 딜_병기 역할)도 실제 장수 명단에 다수 존재해 별도로 채워둠 —
+// 이 경우는 원 데이터(서황/손견/동탁/손상향/태사자/한당 등)의 전법 효과(연타·추가공격·
+// 통솔탈취 등 순수 딜 성향)를 근거로 판단. 근거가 뚜렷하지 않은 조합(예: 창병 지휘_보조)은
+// 일부러 비워 두 subtype이 동점(0)이 되게 해서 null(판단 보류)로 남긴다.
+export const SUBTYPE_ROLE_AFFINITY = {
+  방패병: {
+    // 중방패병: 피격 시 회복 스택 → 생존/지속형 탱커
+    // 검방패병: 제어 저항 + 이상상태 피격 후 딜증가 → 제어에 노출되기 쉬운 역할, 공방 겸용.
+    //   방패병인데 딜/디버프/혼합 역할인 장수(서황·손견·동탁 등, 제어부여·통솔탈취형 전법)는
+    //   생존보다 "맞아도 버티며 딜 넣는" 검방패병 쪽이 실제 전법 성향과 더 맞는다.
+    중방패병: { 탱커_방어: 20, 힐러: 6, 지휘_보조: 4 },
+    검방패병: { 탱커_방어: 12, 디버퍼: 10, 버퍼: 8, 딜_병기: 10, 딜_혼합: 10 }
+  },
+  창병: {
+    // 단창병: 순수 딜 증가형 → 딜러
+    // 장창병: 통솔 감소(디버프) + 최강 방어 정통 → 디버퍼 겸 탱커.
+    //   창병인데 딜_책략 역할(이유·정봉, 디버프/책략 계열 전법)은 파훼(통솔 감소)를 가진
+    //   장창병 쪽이 더 맞는다. 힐러(등애, 전체 피해 감소형)도 방어 성향이 강한 장창병으로 근사.
+    단창병: { 딜_병기: 20, 딜_혼합: 10 },
+    장창병: { 디버퍼: 20, 탱커_방어: 14, 딜_책략: 12, 힐러: 8 }
+  },
+  기병: {
+    // 경기병: 약체 처형형 → 순수 딜러
+    // 중기병: 통솔 증가 + 전열 배치 시 후열 보호 → 탱커/전열 지향.
+    //   기병인데 딜_책략 역할(계략형 전법)은 근거가 약해 의도적으로 비워둠(0점 →
+    //   동점 → null). 확신 없는 조합을 억지로 채우지 않기 위함.
+    경기병: { 딜_병기: 20, 딜_혼합: 12 },
+    중기병: { 탱커_방어: 20, 지휘_보조: 8 }
+  },
+  궁병: {
+    // 장궁병: 아군 치유 증폭 → 힐/서포터
+    // 노병: 이상상태 대상 추가딜 → 디버프 연계 딜러.
+    //   궁병인데 딜_병기 역할(손상향·태사자·한당, 일반공격 연타/추가공격형 전법)은 순수
+    //   딜 성향이 뚜렷해 노병(주는 피해 증가) 쪽이 장궁병(힐 보조)보다 자연스럽다.
+    장궁병: { 힐러: 20, 지휘_보조: 10, 버퍼: 8 },
+    노병: { 딜_책략: 18, 디버퍼: 16, 딜_혼합: 10, 딜_병기: 12 }
+  }
 };

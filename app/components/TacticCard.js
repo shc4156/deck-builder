@@ -5,8 +5,8 @@ export default function TacticCard({ tactic, isSelected, onSelect }) {
   const roleLabel = tacticRoleLabels[tactic.role] || tactic.role;
   const tags = tactic.tags || [];
 
-  // 시즌 뱃지: 시즌2+3은 신규 콘텐츠라는 걸 한눈에 구분할 수 있게 강조색을 다르게 준다.
-  const isNewSeason = tactic.season === 'S2+3';
+  // 시즌 뱃지: 시즌2는 신규 콘텐츠라는 걸 한눈에 구분할 수 있게 강조색을 다르게 준다.
+  const isNewSeason = tactic.season === 'S2';
   const seasonBadge = {
     label: tactic.season || 'S1',
     bg: isNewSeason ? 'rgba(58,123,200,0.22)' : 'rgba(255,255,255,0.08)',

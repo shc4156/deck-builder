@@ -10,8 +10,8 @@ export default function GeneralCard({ general, isSelected, onSelect }) {
   const roleLabel = generalRoleLabels[general.primary_role] || general.primary_role;
   const secondaryRoles = general.secondary_roles || [];
 
-  // 시즌 뱃지: 시즌2+3은 신규 콘텐츠라는 걸 한눈에 구분할 수 있게 강조색을 다르게 준다.
-  const isNewSeason = general.season === 'S2+3';
+  // 시즌 뱃지: 시즌2는 신규 콘텐츠라는 걸 한눈에 구분할 수 있게 강조색을 다르게 준다.
+  const isNewSeason = general.season === 'S2';
   const seasonBadge = {
     label: general.season || 'S1',
     bg: isNewSeason ? 'rgba(58,123,200,0.22)' : 'rgba(255,255,255,0.08)',

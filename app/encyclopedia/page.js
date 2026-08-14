@@ -215,6 +215,7 @@ export default function EncyclopediaPage() {
                     barColor={factionColors[gen.faction] || 'var(--text-muted)'}
                     title={gen.name}
                     subtitle={[inferGeneralRole(gen)?.join?.(' · ') || gen.primary_role, gen.troop_type].filter(Boolean).join(' · ')}
+                    badge={gen.season}
                     onClick={() => setDetailGeneral(gen)}
                   />
                 ))}
@@ -239,6 +240,7 @@ export default function EncyclopediaPage() {
                     barColor="var(--accent)"
                     title={tac.name}
                     subtitle={inferTacticRole(tac)?.join?.(' · ') || tac.type}
+                    badge={tac.season}
                     onClick={() => setDetailTactic(tac)}
                   />
                 ))}
@@ -464,7 +466,7 @@ function ListSection({ children }) {
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 20 }}>{children}</div>;
 }
 
-function ListItem({ barColor, title, subtitle, onClick }) {
+function ListItem({ barColor, title, subtitle, badge, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -475,7 +477,18 @@ function ListItem({ barColor, title, subtitle, onClick }) {
       }}
     >
       <span style={{ flex: 1 }}>
-        <span style={{ display: 'block', fontSize: 14, color: 'var(--text-primary)' }}>{title}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14, color: 'var(--text-primary)' }}>{title}</span>
+          {badge === 'S2' && (
+            <span style={{
+              fontSize: 9, fontWeight: 'bold', padding: '1px 5px', borderRadius: 3,
+              background: 'rgba(58,123,200,0.18)', color: '#5b9fe0',
+              border: '1px solid rgba(58,123,200,0.4)',
+            }}>
+              S2
+            </span>
+          )}
+        </span>
         {subtitle && (
           <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--text-secondary)' }}>{subtitle}</span>
         )}
@@ -523,7 +536,18 @@ function GeneralDetail({ general, combos, onBack }) {
             <img src={general.image_url} alt={general.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : general.name?.charAt(0)}
         </div>
-        <h2 style={{ margin: 0, fontSize: 18, color: 'var(--text-primary)' }}>{general.name}</h2>
+        <h2 style={{ margin: 0, fontSize: 18, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          {general.name}
+          {general.season === 'S2' && (
+            <span style={{
+              fontSize: 10, fontWeight: 'bold', padding: '1px 6px', borderRadius: 3,
+              background: 'rgba(58,123,200,0.18)', color: '#5b9fe0',
+              border: '1px solid rgba(58,123,200,0.4)',
+            }}>
+              S2
+            </span>
+          )}
+        </h2>
         <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
           {[inferGeneralRole(general)?.join?.(' · '), general.faction, general.troop_type].filter(Boolean).join(' · ')}
         </p>
@@ -571,7 +595,18 @@ function TacticDetail({ tactic, recommended, onBack }) {
     <div style={{ paddingBottom: 20 }}>
       <DetailHeader backLabel="전법도감" onBack={onBack} />
 
-      <h2 style={{ margin: '10px 0 4px', fontSize: 18, color: 'var(--text-primary)' }}>{tactic.name}</h2>
+      <h2 style={{ margin: '10px 0 4px', fontSize: 18, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        {tactic.name}
+        {tactic.season === 'S2' && (
+          <span style={{
+            fontSize: 10, fontWeight: 'bold', padding: '1px 6px', borderRadius: 3,
+            background: 'rgba(58,123,200,0.18)', color: '#5b9fe0',
+            border: '1px solid rgba(58,123,200,0.4)',
+          }}>
+            S2
+          </span>
+        )}
+      </h2>
       <p style={{ margin: '0 0 14px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
         {inferTacticRole(tactic)?.join?.(' · ') || tactic.type}
       </p>
