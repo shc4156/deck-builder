@@ -51,6 +51,68 @@ const getTacticGradeBadge = (grade) => {
   return '';
 };
 
+// 🆕 세부병종 추천 배지 — confidence(high/low/none)에 따라 확정/참고용/둘다무방 구분해서 표시
+function SubtypeBadge({ hero }) {
+  if (!hero) return null;
+  const confidence = hero.subtype_confidence;
+
+  // confidence: 'high' → 확정 추천 (실선, 골드)
+  if (confidence === 'high' && hero.subtype) {
+    return (
+      <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>세부 진급</span>
+        <span style={{
+          backgroundColor: 'rgba(184,135,58,0.14)', color: SCROLL.gold,
+          border: `1px solid ${SCROLL.gold}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 700
+        }}>
+          {hero.subtype}
+        </span>
+        {hero.subtype_reason && (
+          <span style={{ fontSize: '10px', color: SCROLL.inkFaint }}>· {hero.subtype_reason}</span>
+        )}
+      </div>
+    );
+  }
+
+  // confidence: 'low' → 참고용 (점선, 흐린 톤)
+  if (confidence === 'low' && hero.subtype) {
+    return (
+      <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>세부 진급(참고)</span>
+        <span style={{
+          backgroundColor: 'transparent', color: SCROLL.inkSoft,
+          border: `1px dashed ${SCROLL.border}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 700
+        }}>
+          {hero.subtype}
+        </span>
+        {hero.subtype_reason && (
+          <span style={{ fontSize: '10px', color: SCROLL.inkFaint }}>· {hero.subtype_reason}</span>
+        )}
+      </div>
+    );
+  }
+
+  // confidence: 'low' + subtype 없음(동점 후보만 있음) 또는 'none' → 둘 다 무방, 회색으로 후보만 나열
+  if (hero.subtype_candidates && hero.subtype_candidates.length > 0) {
+    return (
+      <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>세부 진급</span>
+        {hero.subtype_candidates.map((c, i) => (
+          <span key={i} style={{
+            backgroundColor: 'transparent', color: SCROLL.inkFaint,
+            border: `0.5px solid ${SCROLL.border}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 500
+          }}>
+            {c}
+          </span>
+        ))}
+        <span style={{ fontSize: '10px', color: SCROLL.inkFaint }}>· 둘 다 무방</span>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 // 수동 편성이 특정 티어덱을 얼마나 충족하는지 가로 막대로 표시
 function ComparisonBar({ label, score, color, highlighted }) {
   const pct = Math.max(0, Math.min(100, Math.round(score)));
@@ -1066,6 +1128,10 @@ useEffect(() => {
           troop_mismatch: Boolean(troopSuggestion && assignedGen?.troop_type && troopSuggestion.troop !== assignedGen.troop_type),
           troop_source: troopSuggestion?.source || null,
           troop_reason: troopSuggestion?.reason || null,
+          subtype: troopSuggestion?.subtype || null,
+          subtype_confidence: troopSuggestion?.subtypeConfidence || null,
+          subtype_reason: troopSuggestion?.subtypeReason || null,
+          subtype_candidates: troopSuggestion?.subtypeCandidates || null,
           tactics: processedTactics
         };
       });
@@ -1833,6 +1899,8 @@ useEffect(() => {
                                   </div>
                                 )}
 
+                                <SubtypeBadge hero={hero} />
+
                                 {currentGen?.recommended_equip_stats && (
                                   <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>장비 가이드</span>
@@ -1971,6 +2039,10 @@ useEffect(() => {
                   troop_mismatch: Boolean(suggestion && genObj?.troop_type && suggestion.troop !== genObj.troop_type),
                   troop_source: suggestion?.source || null,
                   troop_reason: suggestion?.reason || null,
+                  subtype: suggestion?.subtype || null,
+                  subtype_confidence: suggestion?.subtypeConfidence || null,
+                  subtype_reason: suggestion?.subtypeReason || null,
+                  subtype_candidates: suggestion?.subtypeCandidates || null,
                 };
               });
 
@@ -2312,6 +2384,8 @@ useEffect(() => {
                                   )}
                                 </div>
                               )}
+
+                              <SubtypeBadge hero={heroTroopSuggestion} />
 
                               {genObj.recommended_equip_stats && (
                                 <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
