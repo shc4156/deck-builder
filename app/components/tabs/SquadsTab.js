@@ -1627,11 +1627,11 @@ useEffect(() => {
 
                   {/* 진형 정보 */}
                   <div style={{
-                    marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    marginBottom: '14px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
                     backgroundColor: SCROLL.bg, padding: '12px 16px',
                     border: `0.5px solid ${SCROLL.headerBorder}`, borderRadius: '10px'
                   }}>
-                    <div style={{ flex: 1, marginRight: '15px' }}>
+                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
                         <span style={{
                           fontSize: '10px', color: SCROLL.inkFaint, fontFamily: SCROLL.mono,
@@ -1646,7 +1646,8 @@ useEffect(() => {
                           style={{
                             padding: '5px 8px', fontWeight: 600, fontSize: '0.85rem',
                             border: `0.5px solid ${SCROLL.border}`,
-                            borderRadius: '6px', backgroundColor: SCROLL.paperMid, color: SCROLL.ink
+                            borderRadius: '6px', backgroundColor: SCROLL.paperMid, color: SCROLL.ink,
+                            maxWidth: '100%'
                           }}
                         >
                           {formations.map(f => {
@@ -1673,10 +1674,12 @@ useEffect(() => {
                       </div>
                     </div>
 
-                    <FormationGridVisual
-                      gridData={squad.formationGrid || calculateAutoFormationGrid(squad.setup, generals)}
-                      onCellClick={(clickedIdx) => handleGridCellClick(squad.id, clickedIdx)}
-                    />
+                    <div style={{ flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
+                      <FormationGridVisual
+                        gridData={squad.formationGrid || calculateAutoFormationGrid(squad.setup, generals)}
+                        onCellClick={(clickedIdx) => handleGridCellClick(squad.id, clickedIdx)}
+                      />
+                    </div>
                   </div>
 
                   {/* 인연/연의/조합 효과 */}
@@ -2115,11 +2118,11 @@ useEffect(() => {
                   <>
                   {/* 진형 정보 */}
                   <div style={{
-                    marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    marginBottom: '14px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
                     backgroundColor: SCROLL.bg, padding: '12px 16px',
                     border: `0.5px solid ${SCROLL.headerBorder}`, borderRadius: '10px'
                   }}>
-                    <div style={{ flex: 1, marginRight: '15px' }}>
+                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '10px', color: SCROLL.inkFaint, fontFamily: SCROLL.mono, letterSpacing: '0.05em' }}>
                           진형
@@ -2130,7 +2133,8 @@ useEffect(() => {
                           style={{
                             padding: '5px 8px', fontWeight: 600, fontSize: '0.85rem',
                             border: `0.5px solid ${SCROLL.border}`,
-                            borderRadius: '6px', backgroundColor: SCROLL.paperMid, color: SCROLL.ink
+                            borderRadius: '6px', backgroundColor: SCROLL.paperMid, color: SCROLL.ink,
+                            maxWidth: '100%'
                           }}
                         >
                           <option value="" style={{ backgroundColor: SCROLL.paperMid, color: SCROLL.ink }}>진형 미지정 (기본 배치)</option>
@@ -2156,10 +2160,12 @@ useEffect(() => {
                       </div>
                     </div>
 
-                    <FormationGridVisual
-                      gridData={manual.formationGrid || calculateAutoFormationGrid(validHeroesForFit, generals)}
-                      onCellClick={(clickedIdx) => handleManualGridCellClick(slotIndex, clickedIdx)}
-                    />
+                    <div style={{ flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
+                      <FormationGridVisual
+                        gridData={manual.formationGrid || calculateAutoFormationGrid(validHeroesForFit, generals)}
+                        onCellClick={(clickedIdx) => handleManualGridCellClick(slotIndex, clickedIdx)}
+                      />
+                    </div>
                   </div>
 
                   {/* 티어덱 대비 완성도 그래프 */}
