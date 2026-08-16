@@ -120,15 +120,25 @@ export function useDeckAssets() {
   };
 
   const toggleTierDeckPin = async (deckId) => {
-    const next = pinnedTierDeckIds.includes(deckId)
-      ? pinnedTierDeckIds.filter(id => id !== deckId)
-      : [...pinnedTierDeckIds, deckId];
+    if (!userId) {
+      alert('로그인 확인 중입니다. 잠시 후 다시 시도해주세요.');
+      return; // userId가 아직 없으면 로컬 state도 건드리지 않고 종료
+      // (화면엔 고정된 것처럼 보이지만 실제로는 저장되지 않는 상황 방지)
+    }
+
+    const prev = pinnedTierDeckIds;
+    const next = prev.includes(deckId)
+      ? prev.filter(id => id !== deckId)
+      : [...prev, deckId];
 
     setPinnedTierDeckIds(next);
 
-    if (!userId) return;
     const { error } = await updateProfile({ pinned_decks: next });
-    if (error) console.error('티어덱 핀 저장 실패:', error.message);
+    if (error) {
+      console.error('티어덱 핀 저장 실패:', error.message);
+      alert('핀 고정 저장에 실패했습니다. 다시 시도해주세요.');
+      setPinnedTierDeckIds(prev); // 실패 시 롤백
+    }
   };
 
   const saveDeck = async () => {

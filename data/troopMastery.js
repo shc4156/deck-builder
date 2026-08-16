@@ -49,8 +49,8 @@ export const TROOP_MASTERY = {
       장창병: {
         classTrait: { name: '파훼', effect: '일반 공격 후 65% 확률로 2턴 동안 목표 통솔 8 감소(최대 2회 중첩)' },
         exclusiveMastery: {
-          name: '견정불이(堅貞不移)',
-          effect: '피격 시 피해 감소(피감) 스택을 중첩 — 전투가 길어질수록 방어력이 극대화되는 창병 최강의 방어 정통',
+          name: '타오르는투지',
+          effect: '피해를 받을 때마다 50%의 확률로 자신이 받는 피해 4% 감소, 2턴 지속(최대 2회 중첩)',
           isKeyMastery: true
         },
         recommendedGenerals: ['허저', '여몽', '장비', '감부인', '조운']

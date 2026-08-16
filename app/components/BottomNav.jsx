@@ -9,15 +9,14 @@ import {
 } from '@tabler/icons-react';
 
 // tab 키는 app/page.js의 TAB_COMPONENTS 키와 일치해야 합니다.
-// 연무/시뮬은 아직 배포하지 않아 비활성화 상태로 노출 — 추후 추가 예정임을 보여줍니다.
-// (실제 이동은 app/page.js의 DISABLED_TABS에서도 막혀 있습니다. 정식 오픈 시
-//  여기서 disabled를 지우고 DISABLED_TABS에서도 함께 제거하세요.)
+// (2026-08-14: 모의 대결(vs) 정교화 버전 반영 후 재오픈 - tab 키를 'simulate'→'vs'로
+//  수정하고 disabled를 해제함. 다시 막아야 할 때는 disabled: true만 추가하면 됩니다.)
 const NAV_ITEMS = [
   { tab: 'status', label: '현황', icon: IconUser },
   { tab: 'matches', label: '티어덱', icon: IconLayoutGrid },
   { tab: 'squads', label: '편성', icon: IconUsers },
   { tab: 'tournament', label: '연무', icon: IconSwords },
-  { tab: 'simulate', label: '시뮬', icon: IconChartBar, disabled: true },
+  { tab: 'vs', label: '시뮬', icon: IconChartBar },
 ];
 
 // current: 현재 활성 탭 키, onChange(tabKey): 탭 전환 콜백

@@ -25,9 +25,9 @@ const TAB_COMPONENTS = {
   tournament: YeonmuTab,
 };
 
-// 배포 시 잠시 닫아두는 탭들 — 연무(tournament)/시뮬(vs)는 컴포넌트와 코드는
-// 그대로 두고, 여기서만 막아둡니다. 다시 열 때는 이 배열에서 지우기만 하면 됩니다.
-const DISABLED_TABS = ['vs'];
+// 배포 시 잠시 닫아두는 탭들 — 여기 다시 추가하면 컴포넌트/코드는 그대로 둔 채 막을 수 있습니다.
+// (2026-08-14: 모의 대결(vs) 정교화 버전 반영 후 재오픈)
+const DISABLED_TABS = [];
 const isTabEnabled = (key) => Boolean(TAB_COMPONENTS[key]) && !DISABLED_TABS.includes(key);
 
 function HomeInner() {
