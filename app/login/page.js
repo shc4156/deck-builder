@@ -180,11 +180,11 @@ export default function LoginPage() {
       }
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        userProfile.email,
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        }
-      );
+  userProfile.email,
+  {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/reset-password`,
+  }
+);
 
       if (resetError) {
         setForgotStatusMsg(`발송 실패: ${resetError.message}`);
