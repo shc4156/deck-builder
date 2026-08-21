@@ -962,13 +962,24 @@ useEffect(() => {
       .map(id => tierDecks.find(d => String(d.id) === String(id)))
       .filter(Boolean);
 
-    const unpinnedDecks = tierDecks
-      .filter(d => !pinnedSet.has(String(d.id)))
-      .map(d => ({ deck: d, fit: computeDeckFitScore(d, myGenNames, myTactNames) }))
-      .sort((a, b) => b.fit - a.fit)
-      .map(x => x.deck);
+const hasSeason2Selection =
+  myGenerals.some(g => g.season === 'S2') ||
+  myTactics.some(t => t.season === 'S2');
 
-    const orderedDecks = [...pinnedDecks, ...unpinnedDecks];
+const unpinnedDecks = tierDecks
+  .filter(d => !pinnedSet.has(String(d.id)))
+  .map(d => ({ deck: d, fit: computeDeckFitScore(d, myGenNames, myTactNames) }))
+  .sort((a, b) => {
+    if (hasSeason2Selection) {
+      const aS2 = (a.deck.season || 'S1') === 'S2';
+      const bS2 = (b.deck.season || 'S1') === 'S2';
+      if (aS2 !== bS2) return aS2 ? -1 : 1;
+    }
+    return b.fit - a.fit;
+  })
+  .map(x => x.deck);
+
+const orderedDecks = [...pinnedDecks, ...unpinnedDecks];
 
     const usedDeckIds = new Set();
     const finalDeckList = [];
