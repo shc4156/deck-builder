@@ -126,9 +126,16 @@ export function useDeckAssets() {
       // (화면엔 고정된 것처럼 보이지만 실제로는 저장되지 않는 상황 방지)
     }
 
+    // ⚠️ deckId는 클릭 시점엔 숫자(deck.id)로 들어오는데, 새로고침 후 DB에서 다시
+    // 불러온 pinnedTierDeckIds 배열의 원소 타입이 문자열/숫자로 뒤섞여 있을 수 있다.
+    // 여기를 엄격 비교(===)로 하면 "화면 표시(String 비교라 정상으로 보임)"와
+    // "실제 토글 판정"이 어긋나서, 이미 고정된 걸 눌러도 해제가 안 되거나
+    // 중복으로 추가되는 등 저장이 꼬이는 원인이 된다. 표시 로직과 동일하게
+    // String() 기준으로 비교/치환한다.
     const prev = pinnedTierDeckIds;
-    const next = prev.includes(deckId)
-      ? prev.filter(id => id !== deckId)
+    const isAlreadyPinned = prev.some(id => String(id) === String(deckId));
+    const next = isAlreadyPinned
+      ? prev.filter(id => String(id) !== String(deckId))
       : [...prev, deckId];
 
     setPinnedTierDeckIds(next);

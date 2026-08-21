@@ -494,6 +494,11 @@ export default function SquadsTab({ onNavigate }) {
   const [lockedGenerals, setLockedGenerals] = useState({});
   const [lockedTactics, setLockedTactics] = useState({});
 
+  // 저장된 편성 설정(티어덱 오버라이드/장수·전법 잠금/자동편성 부대수)을 profile에서 복원했는지 여부.
+  // 이게 true가 되기 전에는 자동편성 로직을 돌리지 않아서, 저장된 값을 불러오기도 전에
+  // 기본값(빈 오버라이드/잠금)으로 새로 자동생성해버려 저장 내용을 덮어쓰는 걸 막는다.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
   const isGeneralLocked = (squadNum, heroIndex) => Boolean(lockedGenerals[`${squadNum}-${heroIndex}`]);
   const isTacticLocked = (squadNum, heroIndex, tacticIndex) => Boolean(lockedTactics[`${squadNum}-${heroIndex}-${tacticIndex}`]);
 
@@ -579,7 +584,16 @@ export default function SquadsTab({ onNavigate }) {
   };
 
   const handleSaveSquads = async () => {
-    const { error } = await updateProfile({ squads: recommendedSquads });
+    const { error } = await updateProfile({
+      squads: recommendedSquads,
+      squad_settings: {
+        squadDeckOverrides,
+        lockedGenerals,
+        lockedTactics,
+        autoSquadCount,
+        desiredSquadCount
+      }
+    });
     if (error) {
       console.error('스쿼드 저장 실패:', error);
       alert('저장 중 오류가 발생했습니다: ' + error.message);
@@ -591,11 +605,29 @@ export default function SquadsTab({ onNavigate }) {
   const syncedSquadsUserIdRef = useRef(undefined);
 useEffect(() => {
   if (!profile) return;
-  if (syncedSquadsUserIdRef.current === userId) return;
+  if (syncedSquadsUserIdRef.current === userId) {
+    return;
+  }
+
+  // 새로고침 직후엔 자동편성 로직이 빈(기본) 오버라이드/잠금 상태로 먼저 돌면서
+  // 저장된 편성을 곧바로 덮어써버리는 문제가 있었다. 저장된 설정을 여기서 먼저 복원한 뒤에
+  // settingsLoaded를 true로 바꿔서, 그 다음부터 돌아가는 자동편성이 저장 당시와 동일한
+  // 입력값(오버라이드/잠금/부대수)으로 계산되어 저장했던 편성과 같은 결과를 재현하도록 한다.
+  const savedSettings = profile?.squad_settings;
+  if (savedSettings) {
+    if (savedSettings.squadDeckOverrides) setSquadDeckOverrides(savedSettings.squadDeckOverrides);
+    if (savedSettings.lockedGenerals) setLockedGenerals(savedSettings.lockedGenerals);
+    if (savedSettings.lockedTactics) setLockedTactics(savedSettings.lockedTactics);
+    if (typeof savedSettings.autoSquadCount === 'number') setAutoSquadCount(savedSettings.autoSquadCount);
+    if (typeof savedSettings.desiredSquadCount === 'number') setDesiredSquadCount(savedSettings.desiredSquadCount);
+  }
+
   if (profile?.squads && profile.squads.length > 0) {
     setRecommendedSquads(profile.squads);
   }
+
   syncedSquadsUserIdRef.current = userId;
+  setSettingsLoaded(true);
 }, [profile, userId]);
 
   useEffect(() => {
@@ -934,6 +966,7 @@ useEffect(() => {
   };
 
   useEffect(() => {
+    if (!settingsLoaded) return; // 저장된 오버라이드/잠금/부대수를 먼저 복원한 뒤에만 계산 시작
     if (isLoading || !tierDecks.length) return;
 
     if (selectedGenerals.length === 0) {
@@ -962,46 +995,96 @@ useEffect(() => {
       .map(id => tierDecks.find(d => String(d.id) === String(id)))
       .filter(Boolean);
 
-const hasSeason2Selection =
-  myGenerals.some(g => g.season === 'S2') ||
-  myTactics.some(t => t.season === 'S2');
-
-const unpinnedDecks = tierDecks
-  .filter(d => !pinnedSet.has(String(d.id)))
-  .map(d => ({ deck: d, fit: computeDeckFitScore(d, myGenNames, myTactNames) }))
-  .sort((a, b) => {
-    if (hasSeason2Selection) {
-      const aS2 = (a.deck.season || 'S1') === 'S2';
-      const bS2 = (b.deck.season || 'S1') === 'S2';
-      if (aS2 !== bS2) return aS2 ? -1 : 1;
-    }
-    return b.fit - a.fit;
-  })
-  .map(x => x.deck);
-
-const orderedDecks = [...pinnedDecks, ...unpinnedDecks];
-
     const usedDeckIds = new Set();
     const finalDeckList = [];
+
+    // 보유 장수/전법 중 시즌2가 하나라도 있으면, 자동편성 3단계(적합도 계산)에서
+    // 시즌2 티어덱을 시즌1보다 우선적으로 제시한다. (적합도 점수보다 시즌 여부를 먼저 따짐)
+    const hasSeason2Selection =
+      myGenerals.some(g => g.season === 'S2') ||
+      myTactics.some(t => t.season === 'S2');
+
+    // 슬롯을 채울 때마다 이미 배정된 덱이 데려간 장수를 빼서,
+    // 뒤 슬롯의 자동 추천은 "이미 다른 부대가 쓴 장수"를 뺀 나머지 보유 장수 기준으로 매번 다시 계산한다.
+    // 이렇게 하면 장수가 겹치는 티어덱보다, 겹치지 않는(남은 장수로 채울 수 있는) 티어덱이 자연히 우선 추천된다.
+    let poolGenNames = [...myGenNames];
+    const takeGeneralsFromPool = (deck) => {
+      const names = [1, 2, 3]
+        .map(i => deck[`hero${i}_name`]?.trim())
+        .filter(Boolean);
+      poolGenNames = poolGenNames.filter(n => !names.includes(n));
+    };
+
+    // 1) 유저가 슬롯별로 직접 지정한 오버라이드 덱은 겹침 여부와 무관하게 최우선으로 배치
     for (let slot = 0; slot < autoSquadCount; slot++) {
       const overrideId = squadDeckOverrides[slot];
       const overrideDeck = overrideId ? tierDecks.find(d => String(d.id) === String(overrideId)) : null;
-
       if (overrideDeck && !usedDeckIds.has(String(overrideDeck.id))) {
-        finalDeckList.push(overrideDeck);
+        finalDeckList[slot] = overrideDeck;
         usedDeckIds.add(String(overrideDeck.id));
-        continue;
-      }
-
-      const nextAuto = orderedDecks.find(d => !usedDeckIds.has(String(d.id)));
-      if (nextAuto) {
-        finalDeckList.push(nextAuto);
-        usedDeckIds.add(String(nextAuto.id));
+        takeGeneralsFromPool(overrideDeck);
       }
     }
 
-    for (let i = 0; i < finalDeckList.length && squads.length < autoSquadCount; i++) {
-      const deck = finalDeckList[i];
+    // 2) 핀 고정 덱도 유저가 직접 지정한 것이므로 겹침 여부와 무관하게 남은 빈 슬롯에 우선 배치
+    pinnedDecks.forEach(d => {
+      if (usedDeckIds.has(String(d.id))) return;
+      const emptySlot = Array.from({ length: autoSquadCount }, (_, i) => i).find(i => !finalDeckList[i]);
+      if (emptySlot === undefined) return;
+      finalDeckList[emptySlot] = d;
+      usedDeckIds.add(String(d.id));
+      takeGeneralsFromPool(d);
+    });
+
+    // 3) 나머지 빈 슬롯은 "남은(겹치지 않는) 보유 장수" 기준으로 매 슬롯마다 다시 적합도를 계산해서
+    //    가장 잘 맞는 티어덱을 순차적으로 채워나간다.
+    for (let slot = 0; slot < autoSquadCount; slot++) {
+      if (finalDeckList[slot]) continue;
+
+      let bestDeck = null;
+      let bestFit = -1;
+      let bestIsS2 = false;
+      tierDecks.forEach(d => {
+        if (usedDeckIds.has(String(d.id))) return;
+        const fit = computeDeckFitScore(d, poolGenNames, myTactNames);
+        const isS2 = (d.season || 'S1') === 'S2';
+
+        if (!bestDeck) {
+          bestFit = fit;
+          bestDeck = d;
+          bestIsS2 = isS2;
+          return;
+        }
+
+        // 시즌2 보유 장수/전법이 하나라도 있으면 시즌2 덱을 우선 채택.
+        // 후보끼리 시즌이 같을 때만 적합도(fit) 점수로 비교한다.
+        if (hasSeason2Selection && isS2 !== bestIsS2) {
+          if (isS2) {
+            bestFit = fit;
+            bestDeck = d;
+            bestIsS2 = isS2;
+          }
+          return;
+        }
+
+        if (fit > bestFit) {
+          bestFit = fit;
+          bestDeck = d;
+          bestIsS2 = isS2;
+        }
+      });
+
+      if (bestDeck) {
+        finalDeckList[slot] = bestDeck;
+        usedDeckIds.add(String(bestDeck.id));
+        takeGeneralsFromPool(bestDeck);
+      }
+    }
+
+    const orderedFinalDeckList = finalDeckList.filter(Boolean);
+
+    for (let i = 0; i < orderedFinalDeckList.length && squads.length < autoSquadCount; i++) {
+      const deck = orderedFinalDeckList[i];
       const parsedHeroes = parseDeckSetup(deck);
       if (parsedHeroes.length === 0) continue;
 
@@ -1172,7 +1255,7 @@ const orderedDecks = [...pinnedDecks, ...unpinnedDecks];
 
     setRecommendedSquads(squads);
     setNeedMoreGenerals(hasEmptySlot || squads.length < autoSquadCount);
-  }, [isLoading, tierDecks, generals, tactics, selectedGenerals, selectedTactics, generalRoles, connections, synergies, pinnedTierDeckIds, autoSquadCount, squadDeckOverrides, lockedGenerals, lockedTactics]);
+  }, [settingsLoaded, isLoading, tierDecks, generals, tactics, selectedGenerals, selectedTactics, generalRoles, connections, synergies, pinnedTierDeckIds, autoSquadCount, squadDeckOverrides, lockedGenerals, lockedTactics]);
 
   const assignedTacticsMap = getAssignedTacticsMap(recommendedSquads);
 
