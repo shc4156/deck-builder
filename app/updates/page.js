@@ -26,17 +26,18 @@ export default function UpdatesPage() {
       const fromFeedback = (feedbackRes.data || []).map((f) => ({
         id: `feedback-${f.id}`,
         date: f.resolved_at,
-        text: f.resolved_note || f.comment,
         source: 'feedback',
         category: f.category,
+        originalComment: f.comment,
+        resolvedNote: f.resolved_note,
       }));
 
       const fromChangelog = (changelogRes.data || []).map((c) => ({
         id: `changelog-${c.id}`,
         date: c.created_at,
-        text: c.content,
         source: 'changelog',
         category: null,
+        text: c.content,
       }));
 
       const merged = [...fromFeedback, ...fromChangelog].sort(
@@ -76,7 +77,7 @@ export default function UpdatesPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '720px' }}>
             {items.map((u) => (
               <div key={u.id} className="scroll-panel" style={{ padding: '18px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                   <span style={{
                     fontSize: '0.8rem', fontWeight: 'bold', padding: '3px 10px',
                     borderRadius: '4px', border: '1px solid var(--gold)', color: 'var(--ink-text)'
@@ -87,9 +88,29 @@ export default function UpdatesPage() {
                     {u.date ? new Date(u.date).toLocaleDateString('ko-KR') : ''}
                   </span>
                 </div>
-                <p style={{ margin: 0, color: 'var(--ink-text)', lineHeight: 1.6 }}>
-                  ✅ {u.text}
-                </p>
+
+                {u.source === 'feedback' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{
+                      fontSize: '0.9rem', color: 'var(--ink-text)', opacity: 0.75,
+                      background: 'rgba(0,0,0,0.03)', border: '1px solid var(--border-strong)',
+                      borderRadius: '4px', padding: '8px 12px', lineHeight: 1.6, whiteSpace: 'pre-wrap'
+                    }}>
+                      <strong style={{ opacity: 0.7 }}>💬 받은 의견:</strong> {u.originalComment}
+                    </div>
+                    <p style={{
+                      margin: 0, color: 'var(--ink-text)', lineHeight: 1.6,
+                      background: 'rgba(58,160,90,0.08)', border: '1px solid rgba(58,160,90,0.3)',
+                      borderRadius: '4px', padding: '8px 12px'
+                    }}>
+                      ✅ {u.resolvedNote || '반영 완료'}
+                    </p>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, color: 'var(--ink-text)', lineHeight: 1.6 }}>
+                    ✅ {u.text}
+                  </p>
+                )}
               </div>
             ))}
           </div>
