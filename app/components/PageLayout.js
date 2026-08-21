@@ -52,6 +52,20 @@ export default function PageLayout({ children }) {
         )}
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <Link
+            href="/updates"
+            style={{
+              padding: '4px 10px',
+              border: '0.5px solid var(--border-strong)',
+              borderRadius: 6,
+              color: 'var(--text-secondary)',
+              fontSize: 11,
+              fontWeight: 500,
+              textDecoration: 'none',
+            }}
+          >
+            📜 업데이트 내역
+          </Link>
           <VersionBadge />
           <AccountSwitcher />
           <button

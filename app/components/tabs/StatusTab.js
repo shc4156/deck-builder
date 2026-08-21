@@ -478,23 +478,30 @@ export default function StatusTab({ onNavigate }) {
       )}
 
       {/* ---------------- 의견 남기기 모달 ---------------- */}
-      {showFeedback && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20,
-        }}>
-          <div className="card" style={{ width: '100%', maxWidth: 420, background: 'var(--bg-surface)', border: '0.5px solid var(--border-strong)', padding: 20, position: 'relative' }}>
-            <button
-              onClick={() => setShowFeedback(false)}
-              aria-label="닫기"
-              style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-            >
-              <IconX size={18} />
-            </button>
-            <FeedbackForm userNickname={userNickname} />
-          </div>
-        </div>
-      )}
+{showFeedback && (
+  <div
+    onClick={() => setShowFeedback(false)}   // ← 추가: 바깥 클릭 시 닫힘
+    style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20,
+    }}
+  >
+    <div
+      className="card"
+      onClick={(e) => e.stopPropagation()}   // ← 추가: 카드 내부 클릭은 안 닫히게
+      style={{ width: '100%', maxWidth: 420, background: 'var(--bg-surface)', border: '0.5px solid var(--border-strong)', padding: 20, position: 'relative' }}
+    >
+      <button
+        onClick={() => setShowFeedback(false)}
+        aria-label="닫기"
+        style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+      >
+        <IconX size={18} />
+      </button>
+      <FeedbackForm userNickname={userNickname} />
+    </div>
+  </div>
+)}
     </>
   );
 }
