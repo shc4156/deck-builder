@@ -591,7 +591,8 @@ export default function SquadsTab({ onNavigate }) {
         lockedGenerals,
         lockedTactics,
         autoSquadCount,
-        desiredSquadCount
+        desiredSquadCount,
+        manualSquads // 장수를 하나하나 직접 골라 짜는 수동 편성 슬롯(autoSquadCount 이후) — 이게 저장 목록에서 빠져있어서 새로고침하면 사라졌었음
       }
     });
     if (error) {
@@ -603,6 +604,12 @@ export default function SquadsTab({ onNavigate }) {
   };
 
   const syncedSquadsUserIdRef = useRef(undefined);
+  // 새로고침 직후, 자동편성 useEffect가 저장된 편성을 재계산으로 덮어쓰지 않도록 막는 플래그.
+  // true인 동안은 "저장된 편성을 그대로 보여주는 중"이라는 뜻 — 사용자가 오버라이드/잠금/부대수를
+  // 실제로 건드리기 전까지는 자동편성을 다시 돌리지 않는다. (재계산 결과가 저장 당시와 100%
+  // 똑같다는 보장이 없어서 — 티어덱 필터 변경 등 로직이 조금만 바뀌어도 다른 편성이 나올 수 있음 —
+  // "복원 후 재계산"이 아니라 "복원했으면 그걸로 끝"이 되어야 저장한 편성이 유지된다.)
+  const skipAutoRecalcRef = useRef(false);
 useEffect(() => {
   if (!profile) return;
   if (syncedSquadsUserIdRef.current === userId) {
@@ -620,10 +627,12 @@ useEffect(() => {
     if (savedSettings.lockedTactics) setLockedTactics(savedSettings.lockedTactics);
     if (typeof savedSettings.autoSquadCount === 'number') setAutoSquadCount(savedSettings.autoSquadCount);
     if (typeof savedSettings.desiredSquadCount === 'number') setDesiredSquadCount(savedSettings.desiredSquadCount);
+    if (savedSettings.manualSquads) setManualSquads(savedSettings.manualSquads);
   }
 
   if (profile?.squads && profile.squads.length > 0) {
     setRecommendedSquads(profile.squads);
+    skipAutoRecalcRef.current = true; // 저장된 편성을 복원했으니, 아래 자동편성 effect는 한 번 건너뛴다
   }
 
   syncedSquadsUserIdRef.current = userId;
@@ -967,6 +976,15 @@ useEffect(() => {
 
   useEffect(() => {
     if (!settingsLoaded) return; // 저장된 오버라이드/잠금/부대수를 먼저 복원한 뒤에만 계산 시작
+
+    // 방금 저장된 편성(profile.squads)을 그대로 복원해온 직후라면, 여기서 다시 자동계산해서
+    // 덮어쓰지 않고 한 번만 건너뛴다. 이후 사용자가 오버라이드/잠금/부대수 등을 실제로 바꾸면
+    // 이 effect가 그 변화에 반응해 정상적으로 재계산한다.
+    if (skipAutoRecalcRef.current) {
+      skipAutoRecalcRef.current = false;
+      return;
+    }
+
     if (isLoading || !tierDecks.length) return;
 
     if (selectedGenerals.length === 0) {
