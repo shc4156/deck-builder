@@ -75,6 +75,17 @@ export default function DevFeedbackPage() {
     setSavingId(null);
   };
 
+  const handleDelete = async (id) => {
+    if (!confirm('이 피드백을 삭제할까요? 되돌릴 수 없습니다.')) return;
+    const { error } = await supabase.from('feedback').delete().eq('id', id);
+    if (error) {
+      console.error('피드백 삭제 실패:', error.message);
+      alert('삭제 중 오류가 발생했습니다: ' + error.message);
+    } else {
+      await fetchFeedback();
+    }
+  };
+
   let displayList = feedbackList.filter(f =>
     categoryFilter === '전체' ? true : f.category === categoryFilter
   );
@@ -208,9 +219,20 @@ export default function DevFeedbackPage() {
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--ink-text)', opacity: 0.6 }}>
-                    {f.nickname || '익명'} · {new Date(f.created_at).toLocaleString('ko-KR')}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--ink-text)', opacity: 0.6 }}>
+                      {f.nickname || '익명'} · {new Date(f.created_at).toLocaleString('ko-KR')}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(f.id)}
+                      style={{
+                        background: 'none', border: '1px solid var(--border-strong)', borderRadius: '4px',
+                        padding: '3px 10px', fontSize: '0.75rem', color: 'var(--ink-text)', cursor: 'pointer'
+                      }}
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
 
                 <p style={{ margin: '0 0 12px', color: 'var(--ink-text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
