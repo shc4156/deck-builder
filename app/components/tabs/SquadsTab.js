@@ -1046,6 +1046,7 @@ useEffect(() => {
       let bestIsS2 = false;
       tierDecks.forEach(d => {
         if (usedDeckIds.has(String(d.id))) return;
+        if (d.deck_category === '개척덱') return; // 개척덱은 개척 시에만 쓰는 덱이라 자동 편성 추천에서 제외
         const fit = computeDeckFitScore(d, poolGenNames, myTactNames);
         const isS2 = (d.season || 'S1') === 'S2';
 
