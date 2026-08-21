@@ -16,6 +16,20 @@ export default function AuthGuard({ children }) {
         router.replace('/login');
         return;
       }
+      // 관리자가 임시번호를 발급한 계정이면, 본인이 새 비밀번호를 설정하기 전까지
+      // reset-password 페이지 외 다른 곳으로 접근하지 못하게 강제 이동시킨다.
+      if (session && pathname !== '/reset-password' && pathname !== '/login') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('must_reset_password')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.must_reset_password) {
+          router.replace('/reset-password');
+          return;
+        }
+      }
       setIsChecking(false);
     }
     checkSession();

@@ -50,6 +50,17 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ success: true });
+
+    // 4) 다음 로그인 시 반드시 본인이 새 비밀번호를 설정하도록 플래그 세팅
+    const { error: flagError } = await supabaseAdmin
+      .from('profiles')
+      .update({ must_reset_password: true })
+      .eq('id', targetUserId);
+
+    if (flagError) {
+      console.error('must_reset_password 플래그 갱신 실패:', flagError.message);
+    }
+
   } catch (err) {
     console.error('비밀번호 재설정 API 에러:', err);
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });

@@ -55,19 +55,23 @@ const getTacticGradeBadge = (grade) => {
 function SubtypeBadge({ hero }) {
   if (!hero) return null;
   const confidence = hero.subtype_confidence;
+  // 티어덱 데이터로 확정된 값이면 '세부 진급(추측)'이 아니라 '고급 병종'으로 표기
+  const isTierdeck = hero.troop_source === 'tierdeck';
+  const label = isTierdeck ? '고급 병종' : '세부 진급';
+  const badgeText = isTierdeck && hero.mastery ? `${hero.subtype} · ${hero.mastery}` : hero.subtype;
 
   // confidence: 'high' → 확정 추천 (실선, 골드)
   if (confidence === 'high' && hero.subtype) {
     return (
       <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-        <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>세부 진급</span>
+        <span style={{ color: SCROLL.inkFaint, fontFamily: SCROLL.mono, fontSize: '10px' }}>{label}</span>
         <span style={{
           backgroundColor: 'rgba(184,135,58,0.14)', color: SCROLL.gold,
           border: `1px solid ${SCROLL.gold}`, padding: '1px 7px', borderRadius: '4px', fontWeight: 700
         }}>
-          {hero.subtype}
+          {badgeText}
         </span>
-        {hero.subtype_reason && (
+        {!isTierdeck && hero.subtype_reason && (
           <span style={{ fontSize: '10px', color: SCROLL.inkFaint }}>· {hero.subtype_reason}</span>
         )}
       </div>
@@ -1129,9 +1133,12 @@ useEffect(() => {
           troop_source: troopSuggestion?.source || null,
           troop_reason: troopSuggestion?.reason || null,
           subtype: troopSuggestion?.subtype || null,
-          subtype_confidence: troopSuggestion?.subtypeConfidence || null,
-          subtype_reason: troopSuggestion?.subtypeReason || null,
+          // 티어덱(source: 'tierdeck')이 세부 병종을 명시한 경우는 추측이 아니라 데이터 그대로이므로 'high'.
+          // 역할 기반 추론(suggestTroopSubtype)이 아직 여기 연결돼 있지 않아 그 외엔 값이 없음.
+          subtype_confidence: troopSuggestion?.subtype && troopSuggestion.source === 'tierdeck' ? 'high' : null,
+          subtype_reason: troopSuggestion?.mastery ? `전용/추천 정통: ${troopSuggestion.mastery}` : (troopSuggestion?.reason || null),
           subtype_candidates: troopSuggestion?.subtypeCandidates || null,
+          mastery: troopSuggestion?.mastery || null,
           tactics: processedTactics
         };
       });
@@ -2043,9 +2050,10 @@ useEffect(() => {
                   troop_source: suggestion?.source || null,
                   troop_reason: suggestion?.reason || null,
                   subtype: suggestion?.subtype || null,
-                  subtype_confidence: suggestion?.subtypeConfidence || null,
-                  subtype_reason: suggestion?.subtypeReason || null,
+                  subtype_confidence: suggestion?.subtype && suggestion.source === 'tierdeck' ? 'high' : null,
+                  subtype_reason: suggestion?.mastery ? `전용/추천 정통: ${suggestion.mastery}` : (suggestion?.reason || null),
                   subtype_candidates: suggestion?.subtypeCandidates || null,
+                  mastery: suggestion?.mastery || null,
                 };
               });
 

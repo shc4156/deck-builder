@@ -34,7 +34,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ko">
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8800882593980842"
-     crossorigin="anonymous"></script>
+     crossOrigin="anonymous"></script>
       <body>
         <AuthGuard>
           <ProfileProvider>{children}</ProfileProvider>

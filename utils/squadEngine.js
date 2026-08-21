@@ -1,12 +1,67 @@
 import { getFormationForTrio, connectionScoreOf } from '../app/lib/squadOptimizer';
 import { buildTacticFamilyIndex, getSubstituteScore } from '../data/tacticCompatibility';
-import { ROLE_TROOP_AFFINITY, suggestTroopSubtype } from '../data/troopMastery';
+import { parseTierDeckTroop, needsTroopReassignment, COARSE_TROOP_TYPES } from '../data/troopMastery';
 
 // 모듈 로드 시 한 번만 생성 — 편성 루프 돌 때마다 다시 만들지 않도록
 const familyIndex = buildTacticFamilyIndex();
 
 /**
- * general_roles(역할별 랭킹) 데이터를 general_name 기준으로 인덱싱합니다.
+ * 티어덱이 이 슬롯에 추천하는 병종(explicitTroop, hero*_troop 원본 문자열)을 해석해
+ * 실제로 어떤 coarse 병종으로 편성해야 하는지 판단한다.
+ *
+ * explicitTroop이 있으면(티어덱 데이터) 그걸 최우선으로 따르되, 다중 추천(" / ")인
+ * 경우 이미 같은 부대에 배정된 다른 장수들과 병종이 겹치지 않는 옵션을 우선 채택한다
+ * (같은 부대에 같은 coarse 병종이 몰리는 걸 피하기 위함 — 상성/진형 다양성 확보).
+ * explicitTroop이 없으면(S1 개척덱 등) 장수 고유 병종(troop_type)을 그대로 쓴다.
+ *
+ * 반환값의 troop은 항상 coarse(방패병/창병/기병/궁병) 4종 중 하나이거나 null.
+ * subtype/mastery는 S2 세부 정보(있으면), source는 값의 출처('tierdeck' | 'native').
+ */
+export function suggestTroopConversion({ generalObj, squadEffectiveTroops = [], explicitTroop = null }) {
+  const nativeTroop = generalObj?.troop_type || null;
+
+  if (!explicitTroop) {
+    return nativeTroop
+      ? { troop: nativeTroop, subtype: null, mastery: null, source: 'native', reason: '무장 고유 병종' }
+      : null;
+  }
+
+  const options = parseTierDeckTroop(explicitTroop);
+  const validOptions = options.filter(o => o.coarse); // 파싱 실패(구표기 등)한 옵션은 제외
+
+  if (validOptions.length === 0) {
+    // 티어덱 값이 있는데 파싱이 안 되면(알 수 없는 표기) 장수 고유 병종으로 폴백
+    return nativeTroop
+      ? { troop: nativeTroop, subtype: null, mastery: null, source: 'native', reason: '병종 표기 인식 실패 — 고유 병종 사용' }
+      : null;
+  }
+
+  if (validOptions.length === 1) {
+    const opt = validOptions[0];
+    return {
+      troop: opt.coarse,
+      subtype: opt.subtype,
+      mastery: opt.mastery,
+      source: 'tierdeck',
+      reason: opt.subtype ? `티어덱 추천: ${opt.subtype} ${opt.mastery || ''}`.trim() : '티어덱 기본 병종 추천'
+    };
+  }
+
+  // 다중 추천 — 이미 부대에 쓰인 coarse 병종과 안 겹치는 옵션 우선
+  const nonOverlapping = validOptions.find(o => !squadEffectiveTroops.includes(o.coarse));
+  const chosen = nonOverlapping || validOptions[0];
+  return {
+    troop: chosen.coarse,
+    subtype: chosen.subtype,
+    mastery: chosen.mastery,
+    source: 'tierdeck',
+    reason: chosen.subtype
+      ? `티어덱 다중 추천 중 선택: ${chosen.subtype} ${chosen.mastery || ''}`.trim()
+      : '티어덱 다중 추천 중 선택'
+  };
+}
+
+/**
  * 한 장수가 attack_carry / support_engine / support_amplifier / support_sustain /
  * control_trigger 등 여러 category에 걸쳐 등장할 수 있는데, 슬롯의 stat_focus만으로는
  * 이 category와 정확히 매칭할 근거가 없어서(taxonomy가 다름), "이 장수가 가장 잘하는
@@ -171,15 +226,9 @@ function getPreferredTypeBonus(preferredType, { trait, tacType, tacDesc }) {
       return (tacDesc.includes('디버프') || tacDesc.includes('무장 해제') || tacDesc.includes('공포') ||
         tacDesc.includes('능력 소진') || tacDesc.includes('침묵') || tacDesc.includes('약화')) ? 20 : 0;
     case '추격':
-      // 추격/액티브는 서로 배타적인 발동 타이밍 — 반대 타입이면 감점해서
-      // 100점 상한에서 서로 구분 안 되는 문제(추격 선호인데 액티브가 동점 100점)를 방지
-      if (tacType === '추격') return 20;
-      if (tacType === '액티브') return -20;
-      return 0;
+      return tacType === '추격' ? 20 : 0;
     case '액티브':
-      if (tacType === '액티브') return 15;
-      if (tacType === '추격') return -15;
-      return 0;
+      return tacType === '액티브' ? 15 : 0;
     case '회심':
       return (tacDesc.includes('회심') || tacDesc.includes('치명')) ? 20 : 0;
     default:
@@ -255,76 +304,6 @@ function findBestSubstituteTactic(originalTacticObj, generalObj, candidatePool) 
 
   scored.sort((a, b) => b.score - a.score);
   return scored[0] || null;
-}
-
-/**
- * 장수 1명에게 병부 전환을 추천할지 계산합니다.
- * explicitTroop(티어덱 curated 값)이 있으면 그걸 그대로 쓰고,
- * 없을 때만 역할 적합도 + 부대 내 병종 통일 시너지를 합쳐 자동 추천합니다.
- * coarse 병종(방패병/창병/기병/궁병)이 정해지면, 그 안의 세부 병종(예: 중방패병/검방패병)도
- * troopMastery의 suggestTroopSubtype으로 이어서 판단해 결과에 함께 담습니다.
- *
- * 주의: coarse 병종 자체는 이미 최적(=병부로 갈아탈 필요 없음)이어서 전환 추천이
- * 없는 경우에도, "지금 병종을 어느 세부(예: 중방패병 vs 검방패병)로 정통 찍을지"는
- * 여전히 유효한 질문이라 subtype 계산은 별도로 계속 진행합니다. 이 경우 troop은
- * nativeTroop 그대로, troop_mismatch는 false로 나가고 subtype만 채워집니다.
- * (explicitTroop 쪽은 티어덱이 coarse 값만 갖고 있어 subtype은 항상 heuristic으로 판단)
- */
-export function suggestTroopConversion({ generalObj, squadEffectiveTroops = [], explicitTroop = null }) {
-  if (explicitTroop) {
-    const subtypeResult = suggestTroopSubtype(explicitTroop, generalObj);
-    return {
-      troop: explicitTroop,
-      source: 'tierdeck',
-      reason: '티어덱 권장값',
-      subtype: subtypeResult?.subtype || null,
-      subtypeSource: subtypeResult?.source || null,
-      subtypeReason: subtypeResult?.reason || null,
-      subtypeConfidence: subtypeResult?.confidence || null,
-      subtypeCandidates: subtypeResult?.candidates || null
-    };
-  }
-  if (!generalObj) return null;
-
-  const nativeTroop = generalObj.troop_type;
-  const affinity = ROLE_TROOP_AFFINITY[generalObj.primary_role] || {};
-  const candidates = ['방패병', '창병', '기병', '궁병'];
-
-  const scoreOf = (troop) => {
-    let score = affinity[troop] || 0;
-    const sameCount = squadEffectiveTroops.filter(t => t === troop).length;
-    score += sameCount === 2 ? 30 : sameCount === 1 ? 10 : 0;
-    if (troop === nativeTroop) score += 8; // 병부 소모 없이 유지 가능 → 현상유지 소폭 가산
-    return score;
-  };
-
-  let best = nativeTroop;
-  let bestScore = scoreOf(nativeTroop);
-  candidates.forEach(troop => {
-    const s = scoreOf(troop);
-    if (s > bestScore) { bestScore = s; best = troop; }
-  });
-
-  const gain = bestScore - scoreOf(nativeTroop);
-  const troopChanged = best !== nativeTroop && gain >= 15;
-
-  // coarse 병종 전환이 없어도(이미 nativeTroop이 최적) subtype은 nativeTroop 기준으로 계속 판단.
-  // 전환이 있으면 전환될 병종(best) 기준으로 판단.
-  const effectiveTroop = troopChanged ? best : nativeTroop;
-  const subtypeResult = suggestTroopSubtype(effectiveTroop, generalObj);
-
-  if (!troopChanged && !subtypeResult) return null;
-
-  return {
-    troop: effectiveTroop,
-    source: troopChanged ? 'heuristic' : 'native',
-    reason: troopChanged ? (gain >= 30 ? '역할+조합 시너지 강함' : '역할 적합도 우위') : '현재 병종 유지, 세부 진급만 추천',
-    subtype: subtypeResult?.subtype || null,
-    subtypeSource: subtypeResult?.source || null,
-    subtypeReason: subtypeResult?.reason || null,
-    subtypeConfidence: subtypeResult?.confidence || null,
-    subtypeCandidates: subtypeResult?.candidates || null
-  };
 }
 
 /**

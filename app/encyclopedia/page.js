@@ -5,7 +5,7 @@ import PageLayout from '../components/PageLayout';
 import { useDeckAssets } from '../../hooks/useDeckAssets';
 import { inferGeneralRole, inferTacticRole, findRecommendedGenerals } from '../../data/roleInference';
 import { GLOSSARY_CATEGORIES } from '../../data/glossary';
-import { TROOP_MASTERY } from '../../data/troopMastery';
+import { TROOP_MASTERY, getSubtypeOptions } from '../../data/troopMastery';
 import { factionColors } from '../../styles/colors';
 import {
   IconChevronLeft,
@@ -517,6 +517,46 @@ function DetailHeader({ backLabel, onBack }) {
   );
 }
 
+function GeneralTroopSection({ coarseTroopType }) {
+  const subtypeOptions = getSubtypeOptions(coarseTroopType);
+  if (subtypeOptions.length === 0) return null;
+
+  return (
+    <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 8, marginBottom: 16 }}>
+      <p style={{ margin: '0 0 4px', fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>
+        병종 진급 (S2 · Lv.35+)
+      </p>
+      <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        Lv.35 진급 시 아래 두 갈래 중 하나를 선택하고, Lv.40에서 해당 계열의 전용 정통 또는 일반 정통 중 1개를 장착합니다.
+      </p>
+      {subtypeOptions.map((opt, i) => (
+        <div
+          key={opt.subtypeName}
+          style={{
+            paddingTop: i > 0 ? 8 : 0,
+            marginTop: i > 0 ? 8 : 0,
+            borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+          }}
+        >
+          <p style={{ margin: '0 0 3px', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
+            {opt.subtypeName}
+            <span style={{ fontWeight: 400, color: 'var(--text-secondary)', fontSize: 11 }}>
+              {' '}— {opt.classTrait?.name}(고유특성)
+            </span>
+          </p>
+          <p style={{ margin: '0 0 4px', fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {opt.classTrait?.effect}
+          </p>
+          <p style={{ margin: 0, fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            <span style={{ fontWeight: 600, color: 'var(--accent)' }}>전용 정통 · {opt.exclusiveMastery?.name}</span>
+            {' '}{opt.exclusiveMastery?.effect}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function GeneralDetail({ general, combos, onBack }) {
   const positiveCombos = combos.filter(c => (c.score ?? 0) >= 0);
   const negativeCombos = combos.filter(c => (c.score ?? 0) < 0);
@@ -562,6 +602,10 @@ function GeneralDetail({ general, combos, onBack }) {
             {general.unique_tactic_effect || '설명이 등록되지 않았습니다.'}
           </p>
         </div>
+      )}
+
+      {general.troop_type && (
+        <GeneralTroopSection coarseTroopType={general.troop_type} />
       )}
 
       <p style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.05em', margin: '0 0 8px' }}>장수 콤보</p>

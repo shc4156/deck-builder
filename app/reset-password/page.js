@@ -42,7 +42,7 @@ export default function ResetPasswordPage() {
     setStatusMsg('');
 
     // 로그인된 세션을 기반으로 새 비밀번호 업데이트 적용
-    const { error } = await supabase.auth.updateUser({
+     const { data: userData, error } = await supabase.auth.updateUser({
       password: newPassword,
     });
 
@@ -50,6 +50,14 @@ export default function ResetPasswordPage() {
       setStatusMsg(`오류: ${error.message}`);
       setIsUpdating(false);
     } else {
+      // 임시번호 강제 재설정 플래그 해제 (본인이 직접 새 비밀번호를 설정했으므로)
+      if (userData?.user?.id) {
+        await supabase
+          .from('profiles')
+          .update({ must_reset_password: false })
+          .eq('id', userData.user.id);
+      }
+
       setStatusMsg('✅ 비밀번호가 성공적으로 변경되었습니다! 잠시 후 로그인 페이지로 이동합니다.');
       // 변경 성공 후 보안을 위해 즉시 로그아웃 처리 후 로그인 페이지로 리다이렉트
       await supabase.auth.signOut();

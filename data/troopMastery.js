@@ -49,9 +49,8 @@ export const TROOP_MASTERY = {
       장창병: {
         classTrait: { name: '파훼', effect: '일반 공격 후 65% 확률로 2턴 동안 목표 통솔 8 감소(최대 2회 중첩)' },
         exclusiveMastery: {
-          name: '타오르는투지',
-          effect: '피해를 받을 때마다 50%의 확률로 자신이 받는 피해 4% 감소, 2턴 지속(최대 2회 중첩)',
-          isKeyMastery: true
+          name: '타오르는 투지',
+          effect: '피해를 받을 때마다 50% 확률로 받는 피해 4% 감소(2턴 지속, 최대 2회 중첩)'
         },
         recommendedGenerals: ['허저', '여몽', '장비', '감부인', '조운']
       }
@@ -92,7 +91,7 @@ export const TROOP_MASTERY = {
         exclusiveMastery: { name: '전우 동심', effect: '아군 치유 시 60% 확률로 병력 추가 회복(치유율 50%, 지력 영향, 매턴 최대 2회)' },
         recommendedGenerals: ['소교', '전풍', '법정', '순욱']
       },
-      노병: {
+      석궁병: {
         classTrait: { name: '강노', effect: '주는 피해 5% 증가, 목표 보유 이상 상태 1개당 추가 1%(최대 8%)' },
         exclusiveMastery: { name: '후방 와해', effect: '후열 적군에게 주는 피해 5% 증가' },
         recommendedGenerals: ['육손', '주유', '황충', '제갈량']
@@ -113,6 +112,65 @@ export const COARSE_TROOP_TYPES = Object.keys(TROOP_MASTERY);
 
 export function getTroopMasteryInfo(coarseTroopType) {
   return TROOP_MASTERY[coarseTroopType?.trim()] || null;
+}
+
+// 세부 병종명(중방패병, 검방패병, 단창병, 장창병, 경기병, 중기병, 장궁병, 석궁병)
+// -> coarse 병종명(방패병/창병/기병/궁병) 역인덱스. 티어덱 hero_troop 문자열 파싱에 사용.
+export const SUBTYPE_TO_COARSE = Object.entries(TROOP_MASTERY).reduce((acc, [coarse, info]) => {
+  Object.keys(info.subtypes).forEach(subtypeName => { acc[subtypeName] = coarse; });
+  return acc;
+}, {});
+
+// 세부 병종명 + 정통명(고유/일반 모두) -> 소속 coarse 병종의 데이터를 즉시 찾기 위한 헬퍼.
+// tier_decks.hero*_troop에 박힌 "[세부병종] [정통명]" 조합에서 세부 병종만 뽑아 쓸 때 사용.
+export function getCoarseBySubtype(subtypeName) {
+  return SUBTYPE_TO_COARSE[subtypeName?.trim()] || null;
+}
+
+/**
+ * S2 tier_decks의 hero*_troop 원본 문자열을 구조화된 옵션 배열로 파싱한다.
+ * 지원 형식:
+ *   - S1(또는 미진급 상태): "궁병" 같은 coarse 단일값 -> [{ coarse:'궁병', subtype:null, mastery:null }]
+ *   - S2 단일 추천: "중기병 철마금과" -> [{ coarse:'기병', subtype:'중기병', mastery:'철마금과' }]
+ *   - S2 다중 추천(" / " 구분): "중기병 철마금과 / 장창병 타오르는 투지" -> 옵션 2개
+ * subtype이 세부 병종 사전에 없는(오탈자·구버전 표기) 경우 subtype:null, raw 필드에 원문을 보존해
+ * 화면에서 "미확인 표기"임을 구분해 보여줄 수 있게 한다.
+ */
+export function parseTierDeckTroop(rawTroop, season) {
+  if (!rawTroop || typeof rawTroop !== 'string') return [];
+  const trimmed = rawTroop.trim();
+  if (!trimmed) return [];
+
+  return trimmed.split('/').map(part => part.trim()).filter(Boolean).map(part => {
+    // coarse 단일값(공백 없음, 4대 병종 중 하나) — S1 기본 병종 표기
+    if (COARSE_TROOP_TYPES.includes(part)) {
+      return { coarse: part, subtype: null, mastery: null, raw: part };
+    }
+
+    // "[세부병종] [정통명...]" — 첫 단어가 세부 병종, 나머지가 정통명
+    const [firstWord, ...rest] = part.split(' ');
+    const coarse = getCoarseBySubtype(firstWord);
+    const mastery = rest.join(' ').trim() || null;
+
+    if (coarse) {
+      return { coarse, subtype: firstWord, mastery, raw: part };
+    }
+
+    // 어느 쪽에도 안 걸리면(구 표기·오탈자 등) 원문만 보존
+    return { coarse: null, subtype: null, mastery: null, raw: part };
+  });
+}
+
+/**
+ * 무장의 기본 coarse 병종(troop_type)과 티어덱이 추천하는 coarse 병종이 다르면
+ * "병부(호부) 사용 덱"으로 판정한다 — S2 문서 4절 "병부 감지" 규칙 그대로.
+ * parsedOptions는 parseTierDeckTroop()의 반환값(다중 추천이면 여러 개)을 받아
+ * 옵션 중 하나라도 무장 기본 병종과 일치하면 병부 불필요로 본다.
+ */
+export function needsTroopReassignment(generalTroopType, parsedOptions) {
+  if (!generalTroopType || !Array.isArray(parsedOptions) || parsedOptions.length === 0) return false;
+  const base = generalTroopType.trim();
+  return !parsedOptions.some(opt => opt.coarse === base);
 }
 
 // 두 세부 진급(subtype) 중 어느 쪽이 이 장수에게 더 맞는지는 자동 판별하지 않고
@@ -255,10 +313,10 @@ export const SUBTYPE_ROLE_AFFINITY = {
   },
   궁병: {
     // 장궁병: 아군 치유 증폭 → 힐/서포터
-    // 노병: 이상상태 대상 추가딜 → 디버프 연계 딜러.
+    // 석궁병: 이상상태 대상 추가딜 → 디버프 연계 딜러.
     //   궁병인데 딜_병기 역할(손상향·태사자·한당, 일반공격 연타/추가공격형 전법)은 순수
-    //   딜 성향이 뚜렷해 노병(주는 피해 증가) 쪽이 장궁병(힐 보조)보다 자연스럽다.
+    //   딜 성향이 뚜렷해 석궁병(주는 피해 증가) 쪽이 장궁병(힐 보조)보다 자연스럽다.
     장궁병: { 힐러: 20, 지휘_보조: 10, 버퍼: 8 },
-    노병: { 딜_책략: 18, 디버퍼: 16, 딜_혼합: 10, 딜_병기: 12 }
+    석궁병: { 딜_책략: 18, 디버퍼: 16, 딜_혼합: 10, 딜_병기: 12 }
   }
 };

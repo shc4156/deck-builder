@@ -4,6 +4,7 @@ import GlossaryText from './GlossaryText';
 import GlossaryModal from './GlossaryModal';
 import { generalRoleColors, generalRoleLabels } from '../../styles/roleColors';
 import { tacticRoleColors, tacticRoleLabels } from '../../styles/roleColors';
+import { getSubtypeOptions } from '../../data/troopMastery';
 
 // 장수/전법 이름 클릭 시 뜨는 상세 팝업.
 // MatchesTab/SquadsTab 등에서 이름(span)에 onClick={() => setDetailTarget({ type: 'general', name })}
@@ -130,6 +131,10 @@ function GeneralDetail({ general, setGlossaryTerm, relatedConnections }) {
         </div>
       )}
 
+      {general.troop_type && (
+        <TroopMasterySection coarseTroopType={general.troop_type} />
+      )}
+
       {relatedConnections.length > 0 && (
         <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 10 }}>
           <div style={{ fontWeight: 600, color: 'var(--accent)', marginBottom: 6, fontSize: 13.5 }}>관련 인연</div>
@@ -144,6 +149,39 @@ function GeneralDetail({ general, setGlossaryTerm, relatedConnections }) {
         </div>
       )}
     </>
+  );
+}
+
+function TroopMasterySection({ coarseTroopType }) {
+  const subtypeOptions = getSubtypeOptions(coarseTroopType);
+  if (subtypeOptions.length === 0) return null;
+
+  return (
+    <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 10, marginBottom: 10 }}>
+      <div style={{ fontWeight: 600, color: 'var(--accent)', marginBottom: 2, fontSize: 13.5 }}>
+        병종 진급 (S2, Lv.35+)
+      </div>
+      <p style={{ margin: '0 0 8px 0', fontSize: 11, color: 'var(--text-faded)' }}>
+        Lv.35 진급 시 아래 두 갈래 중 하나를 선택하고, Lv.40에서 해당 계열의 전용 정통 또는 일반 정통 중 1개를 장착합니다.
+      </p>
+      {subtypeOptions.map(opt => (
+        <div key={opt.subtypeName} style={{ marginBottom: 8, paddingLeft: 8, borderLeft: '2px solid var(--border)' }}>
+          <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 12.5 }}>
+            {opt.subtypeName}
+            <span style={{ fontWeight: 500, color: 'var(--text-secondary)', fontSize: 11.5 }}>
+              {' '}— {opt.classTrait?.name}(고유특성)
+            </span>
+          </div>
+          <p style={{ margin: '2px 0 4px 0', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {opt.classTrait?.effect}
+          </p>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            <span style={{ fontWeight: 600, color: 'var(--accent)' }}>전용 정통 · {opt.exclusiveMastery?.name}</span>
+            {' '}{opt.exclusiveMastery?.effect}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
